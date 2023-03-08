@@ -524,7 +524,7 @@ numgrad <-
 
     # Parallel implementation:
     vars <- 1:nVar
-    listOutput <- mclapply(vars, pderv, fcn, x, f0, ..., mc.cores = nCores)
+    listOutput <- parallel::mclapply(vars, pderv, fcn, x, f0, ..., mc.cores = nCores)
 
     g <- t(matrix(unlist(listOutput), nrow = length(f0)))
     badg <- any(is.nan(g))

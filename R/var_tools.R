@@ -136,44 +136,43 @@ kfVCx <-
   function(y, X, shat, sig, M) {
     ## This is for the case of the state  constant, with the observation
     ## equation y = X %*% s + e, sqrt(Var(e))=M.
-    require(tensor)
     SMALLSV <- 1e-30
     if (!is.null(dim(y))) {
       nv <- dim(y)[2]
       nx <- dim(X)[2]
-      T <- dim(y)[1]
+      Tobs <- dim(y)[1]
     } else {
       nv <- length(y)
       nx <- length(x)
-      T <- 1
-      y <- matrix(T, nv)
-      X <- matrix(T, nx)
+      Tobs <- 1
+      y <- matrix(Tobs, nv)
+      X <- matrix(Tobs, nx)
     }
     nXX <- nv*nx
     nstate <- length(shat)
     omega <- array(sig, c(nx, nv, nx, nv))
     sigObs <- crossprod(M)
     ## ho: kron(I,X) %*% sighat
-    ## ho <- array(0, c(T, nv, nx, nv))
-    ## sv <- array(0, c(T, nv, T, nv))
+    ## ho <- array(0, c(Tobs, nv, nx, nv))
+    ## sv <- array(0, c(Tobs, nv, Tobs, nv))
     ##cat("\nstart double X prod loop", proc.time())
     ## for (iv in 1:nv) {
-    ##     ho[ , iv, , ] <- tensor(X, omega[ , iv, ,  ], 2, 1)
+    ##     ho[ , iv, , ] <- tensor::tensor(X, omega[ , iv, ,  ], 2, 1)
     ##     for (jv in 1:nv)
-    ##         sv[ , iv, , jv] <- tensor(ho[ , iv, , jv ], X, 2, 2) + sigObs[iv, jv] * diag(T)
+    ##         sv[ , iv, , jv] <- tensor::tensor(ho[ , iv, , jv ], X, 2, 2) + sigObs[iv, jv] * diag(Tobs)
     ## }
-    ho <- tensor(X, omega, 2, 1)  #T, nv, nx, nv
-    sv <- tensor(ho, X, 3, 2)     #T, nv, nv, T
+    ho <- tensor::tensor(X, omega, 2, 1)  #Tobs, nv, nx, nv
+    sv <- tensor::tensor(ho, X, 3, 2)     #Tobs, nv, nv, Tobs
     sv <- aperm(sv, c(1,2,4,3))
     for (irow in 1:nv)
       for (icol in 1:nv)
-        sv[ , irow, , icol] <- sv[ , irow, , icol] + sigObs[irow, icol] * diag(T)
-    ##svdsv <- svd( matrix(sv, nv * T, nv * T ))
+        sv[ , irow, , icol] <- sv[ , irow, , icol] + sigObs[irow, icol] * diag(Tobs)
+    ##svdsv <- svd( matrix(sv, nv * Tobs, nv * Tobs ))
     ##cat("\nstart qr", proc.time)
-    qrsv <- qr( matrix(sv, nv * T, nv * T ), LAPACK=TRUE)
+    qrsv <- qr( matrix(sv, nv * Tobs, nv * Tobs ), LAPACK=TRUE)
     rankr <- match(TRUE, abs(diag(qrsv$qr)) < SMALLSV)
     if (is.na(rankr)) {
-      rankr <- nv * T
+      rankr <- nv * Tobs
     } else {
       rankr <- rankr - 1
     }
@@ -187,7 +186,7 @@ kfVCx <-
       shatnew <- shat
       signew <- omega
       if (!all(abs(fcsterr) < 1e-7)) warning("Uninformative H but non-zero fcsterr")
-    } else if (rankr < nv *T) {
+    } else if (rankr < nv *Tobs) {
       R <- qr.R(qrsv)[1:rankr, ]
       d <- diag(R)
       R <- R[ , sort.list(qrsv$pivot)]
@@ -196,13 +195,13 @@ kfVCx <-
       oie <- Q %*% solve(RQ, crossprod(Q, c(fcsterr)))
       lh[1] <- -.5 * c(fcsterr) %*% oie
       lh[2] <- -.5 * sum(log(abs(d)))
-      ho <- matrix(ho, T*nv, nx*nv)
+      ho <- matrix(ho, Tobs*nv, nx*nv)
       shatnew <- shat + oie %*% ho   # works because oie is a vector, not a matrix
       qho <- crossprod(Q, ho)
       signew <- sig - crossprod(qho , solve(RQ, qho))
     } else {
       ## first0 <- match(TRUE, svdsv$d < SMALLSV)
-      ## if (is.na(first0)) first0 <- nv * T + 1
+      ## if (is.na(first0)) first0 <- nv * Tobs + 1
       ## u <- svdsv$u[ , 1:(first0-1), drop=FALSE]
       ## v <- svdsv$v[ , 1:(first0-1), drop=FALSE]
       ## d <- svdsv$d[1:(first0-1), drop=FALSE]
@@ -212,10 +211,10 @@ kfVCx <-
       oie <- solve(qrsv, c(fcsterr))
       lh[1] <- -.5 * c(fcsterr) %*% oie
       lh[2] <- -.5 * sum( log(abs(diag(qr.R(qrsv)))) )
-      ## svoifac <-svifac %*% matrix(ho, nv * T, nx * nv)
+      ## svoifac <-svifac %*% matrix(ho, nv * Tobs, nx * nv)
       ## shatnew <- crossprod(svoifac, ferr) + shat
       ## signew <- sig - crossprod(svoifac)
-      ho <- matrix(ho, T*nv, nx*nv)
+      ho <- matrix(ho, Tobs*nv, nx*nv)
       shatnew <- shat + oie %*% ho
       signew <- sig - crossprod(ho, solve(qrsv, ho))
     }
@@ -224,16 +223,16 @@ kfVCx <-
 
 
 matrictint <-
-  function(S,XXi,T,cx=NULL,cs=NULL)
+  function(S,XXi,Tobs,cx=NULL,cs=NULL)
     ###  S:  usually sample cross product matrix of LS residuals
     ###  cs: instead of S, can provide UT cs s.t. cs'cs==S, as from chol(S) or qr.R(qr(S))
     ### XXi:  inv(X'X) matrix for rhs variables
     ### cx:  instead of XXi, can provide UT cx
-    ###  T:  number of observations
+    ###  Tobs:  number of observations
     ###  w:  log of integrated posterior for SUR or RF VAR with det(Sigma)^(-(m+1)/2) Jeffreys-like prior
-    ###  To get the log of the integral of the likelihood for a VAR with T observations,
-    ###   k rhs variables in each equation, and m equations, set T=T-m-1 and subtract .5*m*(m+1)*log(2*pi).
-    ### We are integrating the exponential of -.5*T*m*log(2*pi)-.5*(T+m+1)*log(det(Sigma))-.5*trace(Sigma\S(beta)).
+    ###  To get the log of the integral of the likelihood for a VAR with Tobs observations,
+    ###   k rhs variables in each equation, and m equations, set Tobs=Tobs-m-1 and subtract .5*m*(m+1)*log(2*pi).
+    ### We are integrating the exponential of -.5*Tobs*m*log(2*pi)-.5*(Tobs+m+1)*log(det(Sigma))-.5*trace(Sigma\S(beta)).
   { if(is.null(cx))
   {
     ## browser()
@@ -258,7 +257,7 @@ matrictint <-
       m <- dim(cs)[1]
     }
 
-    w<-(-T+k+(m-1)/2)*m*.5*log(pi)-(T-k)*sum(log(diag(cs)))+m*sum(log(diag(cx)))+ggammaln(m,(T-k)/2)
+    w<-(-Tobs+k+(m-1)/2)*m*.5*log(pi)-(Tobs-k)*sum(log(diag(cs)))+m*sum(log(diag(cx)))+ggammaln(m,(Tobs-k)/2)
     return(w)
   }
 
@@ -317,13 +316,13 @@ mgnldnsty <-
 ###
   {
     if (is.null(dim(ydata)))  ydata <- matrix(ydata, ncol=1)
-    T <- dim(ydata)[1]
+    Tobs <- dim(ydata)[1]
     nv <- dim(ydata)[2]
     if (const) {
-      xdata <- cbind(xdata, matrix(1,T,1))
+      xdata <- cbind(xdata, matrix(1,Tobs,1))
     }
     ## looks likely that const=FALSE, xdata=NULL case crashes.  (2012.9.24)
-    if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == T)
+    if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == Tobs)
     Tx <- dim(xdata)[1]
     nx <- dim(xdata)[2]
     ## 2013.8 fix:  added urprior here, set lambda and mu to NULL in rfvar3 call, so
@@ -335,7 +334,7 @@ mgnldnsty <-
     }
     vp <- varprior(nv,nx,lags,mnprior,vprior, urprior=list(lambda=lambda, mu=mu), ybar=ybar)
     ## vp$: ydum,xdum,pbreaks
-    var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1),
+    var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, Tobs, Tobs + vp$pbreaks), ncol=1),
                  const=FALSE, lambda=NULL, mu=NULL, ic=ic) # const is FALSE in this call because ones alread put into xdata
     Tu <- dim(var$u)[1]
     if ( var$snglty > 0 ) error( var$snglty, " redundant columns in rhs matrix")
@@ -483,25 +482,25 @@ rfvar3 <-
     #### on (A0, lmd) alone makes more sense. With lmd varying, rf estimates change with lmd.
     ####
     if (is.null(dim(ydata))) dim(ydata) <- c(length(ydata),1)
-    T <- dim(ydata)[1]
-    #### Note that if rfvar3() has been called with dummy obs's already in place, this T
+    Tobs <- dim(ydata)[1]
+    #### Note that if rfvar3() has been called with dummy obs's already in place, this Tobs
     #### includes the dummies.
     nvar <- dim(ydata)[2]
     ####nox <- isempty(xdata)
     if (const) {
-      xdata <- cbind(xdata,matrix(1,T,1))
+      xdata <- cbind(xdata,matrix(1,Tobs,1))
     }
     nox <- identical(xdata,NULL)
     if(!nox){
-      T2 <- dim(xdata)[1]
+      Tobs2 <- dim(xdata)[1]
       nx <- dim(xdata)[2]
     } else {
-      T2 <- T; nx <- 0; xdata <- matrix(0,T2,0)
+      Tobs2 <- Tobs; nx <- 0; xdata <- matrix(0,Tobs2,0)
     }
     #### note that x must be same length as y, even though first part of x will not be used.
     #### This is so that the lags parameter can be changed without reshaping the xdata matrix.
     ####
-    if (!identical(T2,T)) {
+    if (!identical(Tobs2,Tobs)) {
       print('Mismatch of x and y data lengths')
       return()
     }
@@ -520,7 +519,7 @@ rfvar3 <-
       #### Any use of tsp(ydata) has to be in external processing functions.
       nbreaks <- length(breaks)
     }
-    breaks <- c(0,breaks,T)
+    breaks <- c(0,breaks,Tobs)
     if(any(breaks[2:length(breaks)] < breaks[1:(length(breaks)-1)]))
       stop("list of breaks must be in increasing order\n")
     #### initialize smpl as null if initial observations are only there for lambda/mu prior.
@@ -595,7 +594,7 @@ rfvar3 <-
       } else {
         nsig <- 1
       }
-      Tsigbrk <- c(Tsigbrk, T)
+      Tsigbrk <- c(Tsigbrk, Tobs)
       lmdndx <- rep(1:nsig, times=diff(Tsigbrk))
       lmdseries <- lmd[ , lmdndx]
       if ( Tsmpl < dim(y)[1] ) {      ##dummy obs formed in rfvar3
@@ -650,7 +649,7 @@ rfvar3 <-
 
       ## Parallel implementation
       ##linreg in a separate file
-      ##listOutput <- mclapply(1:nvar, linreg, lmdseries, X, ya0, mc.cores = cores)
+      ##listOutput <- parallel::mclapply(1:nvar, linreg, lmdseries, X, ya0, mc.cores = cores)
       listOutput <- lapply(1:nvar, linreg, lmdseries, X, ya0, drawbe = drawbe)
       errorflags <- matrix(unlist(sapply(listOutput, '[[', 1)))
       if (any(errorflags)) return(NULL) ##tells program to blow up the likelihood
@@ -747,28 +746,28 @@ rfvar3 <-
 
 
 SVARlh <-
-  function(A0,sigma,T) {
+  function(A0,sigma,Tobs) {
   ## Calculates log likelihood (or posterior density, if conjugate prior has been used) for an
   ## overidentified structural VAR, assuming restrictions on the contemporaneous coefficient
   ## matrix A0 only.
   ##
   ## Note that determinant() returns the log of the determinant, as a list.
-  lh <- -.5 * T * log(2*pi) + T * with(determinant(A0), modulus) - .5 * T * sum(crossprod(A0) * sigma)
+  lh <- -.5 * Tobs * log(2*pi) + Tobs * with(determinant(A0), modulus) - .5 * Tobs * sum(crossprod(A0) * sigma)
   return(lh)
 }
 
 
-SVARlh0 <- function(pvec, idmat, sigma, T) {
+SVARlh0 <- function(pvec, idmat, sigma, Tobs) {
   ## idmat is a logical matrix, TRUE where A0 has a non-zero coefficient
   ## pvec  is the vector of parameter values that fill A0[idmat].
   ## sigma is the covariance matrix of estimated residuals from the reduced
   ##       form VAR
-  ## T     is the sample size.
+  ## Tobs     is the sample size.
   ## This function returns minus the likelihood, so it can be used directly in csminwel
   n <- dim(idmat)[1] # better be same as dim(idmat[2])
   A0 <- matrix(0,n,n)
   A0[idmat] <- pvec
-  lh <- SVARlh(A0, sigma, T)
+  lh <- SVARlh(A0, sigma, Tobs)
   Tdum <- 60
   lh <- lh + 2*Tdum*log(abs(A0[1,1])) - Tdum*((.005*A0[1,1] + .003*A0[1,2])^2/2 + .01 * A0[1,5]^2) #prior isn't normalized
   return(-lh)
@@ -801,8 +800,8 @@ varprior <-  function(nv=1,nx=0,lags=1,mnprior=list(tight=5,decay=.5),
 )
   ### ydum, xdum:   dummy observation data that implement the prior
   ### breaks:       vector of points in the dummy data after which new dummy obs start
-  ###                   Set breaks=T+matrix(c(0,breaks),ncol=1), ydata=rbind(ydata,ydum), xdum=rbind(xdata,xdum), where
-  ###                   actual data matrix has T rows, in preparing input for rfvar3
+  ###                   Set breaks=Tobs+matrix(c(0,breaks),ncol=1), ydata=rbind(ydata,ydum), xdum=rbind(xdata,xdum), where
+  ###                   actual data matrix has Tobs rows, in preparing input for rfvar3
   ### nv,nx,lags: VAR dimensions
   ### mnprior$tight:Overall tightness of Minnesota prior. 1/tight ~ own lag std dev
   ### mnprior$decay:Standard deviations of lags shrink as lag^(-decay)
@@ -835,7 +834,7 @@ varprior <-  function(nv=1,nx=0,lags=1,mnprior=list(tight=5,decay=.5),
 ###                   univariate ARs.
 ###
 ###
-{ require(abind)
+{
   ## nx=0 case messes up, at least at the end (2012.9.23)
   if (!is.null(mnprior)) ## implement an MN prior
   { ## single-coefficient prior dummy obs.
@@ -950,8 +949,8 @@ varprior <-  function(nv=1,nx=0,lags=1,mnprior=list(tight=5,decay=.5),
     for (iv in which(nstat)) {
       ydumuri[ , iv, iv] <- ybar[iv]
     }
-    ydumur <- abind(ydumur, urprior$mu *ydumuri, along=3)
-    xdumur <- abind(xdumur, array(0, c(lags+1, nx, nv)), along=3)
+    ydumur <- abind::abind(ydumur, urprior$mu *ydumuri, along=3)
+    xdumur <- abind::abind(xdumur, array(0, c(lags+1, nx, nv)), along=3)
   }
   if (!is.null(vprior) && vprior$w > 0)
   {
@@ -971,8 +970,8 @@ varprior <-  function(nv=1,nx=0,lags=1,mnprior=list(tight=5,decay=.5),
     dim(xdum) <- c(lags + 1, nx, lags * nv)
   }
 
-  ydum <- abind(ydum, ydumc, ydumur, ydum2, along=3)
-  xdum <- abind(xdum, xdumc, xdumur, xdum2, along=3)
+  ydum <- abind::abind(ydum, ydumc, ydumur, ydum2, along=3)
+  xdum <- abind::abind(xdum, xdumc, xdumur, xdum2, along=3)
   breaks <- (lags+1) * (1:(dim(ydum)[3] -1)) # end of sample is not a "break".
   ydum <- aperm(ydum, c(1, 3, 2))
   ydum <- matrix(ydum, ncol=dim(ydum)[3])
@@ -1004,7 +1003,7 @@ varprior <-  function(nv=1,nx=0,lags=1,mnprior=list(tight=5,decay=.5),
   dimnames(ydum) <- list(NULL, names(vprior$sig))
   dimnames(xdum) <- list(NULL, names(xsig))
   return(list(ydum=ydum,xdum=xdum,pbreaks=breaks))
-  ## data here in the form of T by nv y, and T x nx x.  Lagged y's not put in to a rhs
+  ## data here in the form of Tobs by nv y, and Tobs x nx x.  Lagged y's not put in to a rhs
   ## regression matrix, so a "breaks" vector is needed.
   ## rfvar3 adds persistence and sum of coeffs dummy observations at end of  data in lhs and rhs
   ## regression matrix form.  So to combine this with rfvar3, set lambda and mu to NULL in one or the

@@ -36,7 +36,7 @@ applynl <-
     iseries[(mydata[,iv] >= ct)] <- (1+beta) * (iseries[(mydata[,iv] >= ct)] - ct) + ct2
     jterm <- jterm + sum(mydata[,iv] > ct) * log(1+beta)
 
-    ## pdf('~/check.pdf')
+    ## grDevices::pdf('~/check.pdf')
     ## ## irange <- (mydata[,iv] > att) & (mydata[,iv] < ct)
     ## ## plot(mydata[irange,iv],iseries[irange])
     ## plot(mydata[,iv],iseries,type <- 'l')
@@ -115,12 +115,12 @@ bvarwrap_tvA <-
 
     ## Preparing and formatting data
 
-    ## Things that don't change, like nVar and T, /should/ be bound outside
+    ## Things that don't change, like nVar and Tobs, /should/ be bound outside
     ## the iteration, but performance gains are probably small
 
     nSig <- length(Tsigbrk)              #number of regimes
     nVar <- dim(listData$Y)[2]           #number of variables
-    T <- dim(listData$Y)[1]
+    Tobs <- dim(listData$Y)[1]
 
     A <- array(0, c(nVar, nVar, nSig))   #different A matrix for each regime
 
@@ -456,11 +456,11 @@ bvarwrap5 <-
 
     ## Preparing and formatting data ----
 
-    ## Things that don't change, like nVar and T, /should/ be bound outside
+    ## Things that don't change, like nVar and Tobs, /should/ be bound outside
     ## the iteration, but performance gains are probably small
 
     nVar <- dim(listData$Y)[2]
-    T <- dim(listData$Y)[1]
+    Tobs <- dim(listData$Y)[1]
     A <- matrix(0, nVar, nVar)
     varnames <- dimnames(listData$Y)[[2]]
 
@@ -1271,10 +1271,10 @@ gdraw <-
 get_forecast <-
   function(tout,
            nperiods = 8,
-           T = dim(ydata)[1]){
+           Tobs = dim(ydata)[1]){
 
     ## gets a forecast nperiods into the future
-    ## starts at cap T
+    ## starts at cap Tobs
 
     ## input to this function is full output of optimization
 
@@ -1303,11 +1303,11 @@ get_forecast <-
     sys <- sysmat(By = By, Bx = Bx)
     ## get the data vector
 
-    ## T <- dim(ydata)[1]
+    ## Tobs <- dim(ydata)[1]
     y <- matrix(0,nv,nlags)
 
     for (ilag in 1:nlags){
-      y[,ilag] <- ydata[T - ilag + 1,]
+      y[,ilag] <- ydata[Tobs - ilag + 1,]
     }
 
     y <- c(y,1) # constant at the end
@@ -1353,13 +1353,13 @@ get_mdd <-
 
     ## first, get a Gaussian approx
     xmean <- apply(x,2,mean)
-    T <- dim(x)[1]
+    Tobs <- dim(x)[1]
     nv <- dim(x)[2]
-    ## covmat <- crossprod(x) / T
+    ## covmat <- crossprod(x) / Tobs
 
     if (covsub){
       ## use subsample for the covariance matrix
-      xsub <- seq(from=1,to=T,length.out = 5000)
+      xsub <- seq(from=1,to=Tobs,length.out = 5000)
       covmat <- cov(x[xsub,])
     } else {
       covmat <- cov(x)
@@ -1452,7 +1452,7 @@ getrmse <-
     nv <- dim(fcast)[2] ## number of variables
     nfc <- dim(fcast)[3] ## number of forecasts
     nh <- length(h) ## number of horizons to consider
-    T <- dim(ydata)[1]
+    Tobs <- dim(ydata)[1]
 
     rmse <- array(0, c(nh,nv,nfc))
 
@@ -1460,7 +1460,7 @@ getrmse <-
       if (sum(abs(fcast[,,it])) > 1e-10){ ## make sure fc is not blank
         for (ih in 1:nh){
           hzn <- h[ih] ## what horizon
-          if ((hzn + it) <= T){ ## make sure there is space
+          if ((hzn + it) <= Tobs){ ## make sure there is space
             df <- fcast[1:hzn,,it] - ydata[it + 1:hzn,]
             if (hzn > 1){
               rmse[ih,,it] <- sqrt(apply(df^2,2,sum) / hzn)
@@ -1490,7 +1490,7 @@ GsnMove <-
 
 
 
-    x1 <- x0 + mvrnorm(n = 1, mu = rep(0, length(x0)), Sigma = Sigma)
+    x1 <- x0 + MASS::mvrnorm(n = 1, mu = rep(0, length(x0)), Sigma = Sigma)
 
     newmodel <- lhfcn(x1, lcA0 = lcA0, lcLmd = lcLmd, ..., verbose = TRUE)
     lh1 <- newmodel$lh
@@ -1680,7 +1680,6 @@ impulseplots <-
     ## Handles blocking of the impulse responses into several minigarphs
 
 
-    require(grDevices)
 
 
     ## Some formatting issues
@@ -1688,18 +1687,18 @@ impulseplots <-
 
 
     if (format == 'pdf'){ ## different methods for the "light color" for pdf and eps
-      shades <- rgb(color[1], color[2], color[3], alpha)
+      shades <- grDevices::rgb(color[1], color[2], color[3], alpha)
     } else if (format == 'eps'){
-      trellis.device(device="postscript", color = TRUE)
+      lattice::trellis.device(device="postscript", color = TRUE)
       #setEPS()
-      ## postscript(filename, width = width, height = height)
+      ## grDevices::postscript(filename, width = width, height = height)
 
       # Cannot do transparent colors, so here is a crude workaround
       alphafy <-
         function(col,alpha=1) {
           rr <-
             1-alpha*(1-c(col/255))
-          return(rgb(rr[1],rr[2],rr[3]))
+          return(grDevices::rgb(rr[1],rr[2],rr[3]))
         }
       color <- alphafy(color, alpha)
 
@@ -1761,11 +1760,11 @@ impulseplots <-
       ## open the file
       if (format == 'pdf'){
         fname <- paste(filename,'_',ib,'.pdf', sep = '')
-        pdf(fname, width = width, height = height)
+        grDevices::pdf(fname, width = width, height = height)
       } else if (format == 'eps'){
         fname <- paste(filename,'_',ib,'.pdf', sep = '')
-        trellis.device(device="postscript", color = TRUE)
-        postscript(fname,width=width,height=height)
+        lattice::trellis.device(device="postscript", color = TRUE)
+        grDevices::postscript(fname,width=width,height=height)
       }
 
 
@@ -1780,15 +1779,15 @@ impulseplots <-
 
         for (sv in blocks[[ib]]$y){ ## shocks
           plot(ir[rv,sv,],
-               ylim <- response_ylim[rv,],
-               type <- 'l',
-               lwd <- 0.5,
-               xlab <- '',
-               ylab <- '',
-               yaxt  <- 'n',
-               xaxt <- 'n',
-               ## fg <- gray(gr),
-               xlim <- c(1,nsteps), xaxs = 'i')
+               ylim = response_ylim[rv,],
+               type = 'l',
+               lwd = 0.5,
+               xlab = '',
+               ylab = '',
+               yaxt  = 'n',
+               xaxt = 'n',
+               ## fg = gray(gr),
+               xlim = c(1,nsteps), xaxs = 'i')
 
           ytick <- pretty(response_ylim[rv,],4)
 
@@ -1948,7 +1947,7 @@ IrRun2 <-
       sndraws <- matrix(rnorm(nDraws), c(nDraws, 1))
       matAplus <- t(matrix(Aplus, nEq, nEq * nLags))
       #### Aplusdraws <- t(chol(Sigma)) %*% sndraws
-      Aplusdraws <- mvrnorm(1,rep(0,dim(Sigma)[1]),Sigma) #### new method?
+      Aplusdraws <- MASS::mvrnorm(1,rep(0,dim(Sigma)[1]),Sigma) #### new method?
       Aplusnoise <- matrix(Aplusdraws, c(nEq * nLags + 1, nEq)) ##i.e., the matrix of noise that I am adding to the posterior mean/mode
       Aplus  <- matAplus + Aplusnoise[1:(nEq*nLags),] ##ignoring the constant, which is last row
 
@@ -2042,7 +2041,7 @@ linreg <- function(iq, lmdseries, X, ya0, drawbe = FALSE){
 
     xxi <- solve(xx)
 
-    ## coefs_noise <- mvrnorm(1,rep(0,length(lso$coefficients)),xxi)
+    ## coefs_noise <- MASS::mvrnorm(1,rep(0,length(lso$coefficients)),xxi)
     exxi <- eigen(xxi)
     if (any(exxi$values < 1e-14)){ ## seems like reasonable tolerance
       coefs_draw <- NULL
@@ -2145,11 +2144,6 @@ McmcIr <-
 
     ## END PREAMBLE
 
-
-    library(parallel)
-    library(MASS)
-    library(coda)
-
     vars <- colnames(model$A)
 
     nTrials <- dim(xout)[1]
@@ -2201,7 +2195,7 @@ McmcIr <-
 
     listXout <- lapply(1:nX, function(iRow){xout[iRow,]})
 
-    listIrtrials <- mclapply(listXout, IrRun2, model$A,
+    listIrtrials <- parallel::mclapply(listXout, IrRun2, model$A,
                              model$lmd, model$listData, model$lcA,
                              model$lcLmd, nLags = model$nLags,
                              owflag = owflag, aflag = aflag,
@@ -2230,10 +2224,10 @@ McmcIr <-
 
     output$ir <- array(output$ir, dim = c(length(vars), length(vars), 60, length(lrange), nTrials))
 
-    if (class(xout) == 'mcmc'){
-      output$x <- mcmc(t(output$x), thin = thin(xout))
+    if (inherits(xout, 'mcmc')){
+      output$x <- coda::mcmc(t(output$x), thin = thin(xout))
     }
-    output$ess <- effectiveSize(output$x)
+    output$ess <- coda::effectiveSize(output$x)
     if (rootcheck) output$iscomplex <- t(output$iscomplex)
 
     return(output)
@@ -2259,7 +2253,7 @@ msvreg <- function(dmat,
   ## dmat : matrix of dependent variables. It's assumed that
   ##        column 1 is REAL output
   ##        columns 2 to N are the credit variables
-  ## ngdp: specify this as a T x 1 vector of nominal gdp, or log real + log price level
+  ## ngdp: specify this as a Tobs x 1 vector of nominal gdp, or log real + log price level
   ## hd and hi: size of difference for dependent and independent variables respectively
   ## rel : if TRUE, take independent variable relative to GDP
   ## ratio: if TRUE, take ind. variable as ratio to GDP
@@ -2267,17 +2261,17 @@ msvreg <- function(dmat,
   ## verbose : if true, return (fake) data
 
 
-  T <- dim(dmat)[1]
+  Tobs <- dim(dmat)[1]
 
   ## preparing the dep. var
-  depvar <- matrix(NA,T,1)
-  depvar[1:(T-hd)] <- dmat[(hd+1):T,1] - dmat[1:(T-hd),1]
+  depvar <- matrix(NA,Tobs,1)
+  depvar[1:(Tobs-hd)] <- dmat[(hd+1):Tobs,1] - dmat[1:(Tobs-hd),1]
 
 
 
   ## preparing the independent variables
   ncredit <- dim(dmat)[2] - 1
-  indvar <- matrix(NA,T,ncredit)
+  indvar <- matrix(NA,Tobs,ncredit)
 
   creditvar <- dmat[,-1,drop=FALSE] ## this works no matter how many there are
 
@@ -2300,18 +2294,18 @@ msvreg <- function(dmat,
 
   }
 
-  indvar[(hi+2):T,] =
-    as.matrix(creditvar[(hi+1):(T-1),] - ## t-1
-                creditvar[1:(T-1-hi),]) ## t-1-hi
+  indvar[(hi+2):Tobs,] =
+    as.matrix(creditvar[(hi+1):(Tobs-1),] - ## t-1
+                creditvar[1:(Tobs-1-hi),]) ## t-1-hi
   sd <- c(sd(indvar[,1],na.rm=TRUE),sd(indvar[,2],na.rm=TRUE))
 
   ## adding lags if desired
   if (nlag > 0){
-    lagmat <- matrix(NA,T,nlag)
+    lagmat <- matrix(NA,Tobs,nlag)
     diffY <- c(0,diff(c(dmat[,1])))
     for (ilag in 1:nlag){
-      ## lagmat[(hd +ilag):T,ilag]  <- depvar[1:(T-hd-ilag)]
-      lagmat[(1 +ilag):T,ilag]  <- diffY[1:(T-ilag)]
+      ## lagmat[(hd +ilag):Tobs,ilag]  <- depvar[1:(Tobs-hd-ilag)]
+      lagmat[(1 +ilag):Tobs,ilag]  <- diffY[1:(Tobs-ilag)]
     }
     indvar <- cbind(indvar,lagmat)
   }
@@ -2472,7 +2466,7 @@ plotfc <- function(fcout, ydata, dateseq,
 
 
 
-  pdf(paste(filename,'.pdf',sep = ''),width = 6.5, height = 8)
+  grDevices::pdf(paste(filename,'.pdf',sep = ''),width = 6.5, height = 8)
 
   ## plotting, could be adjusted for nv
   par(mfrow = c(5,2),col.lab="black",col.main="black",
@@ -2506,7 +2500,7 @@ plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
 
   nv <- dim(rmse1)[2]
 
-  pdf(paste(filename,'.pdf',sep = ''),height = 8, width = 6.5)
+  grDevices::pdf(paste(filename,'.pdf',sep = ''),height = 8, width = 6.5)
 
   par(mfrow = c(nv,1),col.lab="black",col.main="black",
       oma=c(1,3,1,2), mar=c(2,1,1,1), tcl=-0.1, mgp=c(0,0,0))
@@ -2514,13 +2508,13 @@ plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
   nrmse <- c(1,6,12,24,48) ## number of months
   nrmse <- nrmse[ih]
   ## snip these off the end
-  T <- dim(rmse1)[3]
+  Tobs <- dim(rmse1)[3]
 
-  irange <- 1:(T-nrmse)
+  irange <- 1:(Tobs-nrmse)
 
-  ## rmse1 <- rmse1[,,1:(T-nrmse)]
-  ## rmse2 <- rmse1[,,1:(T-nrmse)]
-  ## rmse3 <- rmse1[,,1:(T-nrmse)]
+  ## rmse1 <- rmse1[,,1:(Tobs-nrmse)]
+  ## rmse2 <- rmse1[,,1:(Tobs-nrmse)]
+  ## rmse3 <- rmse1[,,1:(Tobs-nrmse)]
 
   if (rshade) {
     ## gen list of recessions
@@ -2655,7 +2649,6 @@ restrictVAR <-
     ## Note 2013-3-4:  Try eliminating scale effects by converting X'X to correlation matrix
     if (length(type) > 1) type <- type[1]
     if (type == "SVhtskd") {
-      require("tensor")
       bvw <- vout
       vout <- bvw$vout$var
     }
@@ -2696,7 +2689,7 @@ restrictVAR <-
     ## Note that t(rv) spans the same space as rmat, so the restrictiosn are crossprod(v,coeffs)=gamma
     ## rv <- svdr$v    #2013.5.9
     if (length(type) > 1) type <- type[1]
-    T <- if (type == "3" || type == "SVhtskd") dim(vout$u)[1] else dim(vout$fcsterr)[1]
+    Tobs <- if (type == "3" || type == "SVhtskd") dim(vout$u)[1] else dim(vout$fcsterr)[1]
     if (type == "3") {
       sig <- cov(vout$u)
       svdsig <- svd(sig)
@@ -2711,18 +2704,18 @@ restrictVAR <-
       ## line above seems to be a mistake, since xxi is already x'x-inverse
       sqrtVb <- kronecker(sqrt(svdsig$d) * t(svdsig$u), sqrt(svdxxi$d) * t(svdxxi$u))
       dgVb <- apply(sqrtVb^2, 2, sum)
-      rmatC <- rmat %*% diag(sqrt(T * dgVb))
-      sqrtVbC <- sqrtVb %*% diag(1/sqrt(T * dgVb))
+      rmatC <- rmat %*% diag(sqrt(Tobs * dgVb))
+      sqrtVbC <- sqrtVb %*% diag(1/sqrt(Tobs * dgVb))
       lndetVb <- sum(log(svdsig$d)) * dim(vout$xxi)[1] + sum(log(svdxxi$d)) * dim(sig)[1]
-      lndetVbC <- lndetVb - sum(log(dgVb * T))
+      lndetVbC <- lndetVb - sum(log(dgVb * Tobs))
     } else if (type == "KF") {          #type=="KF"
       svdVb <- svd(vout$Vb)
       sqrtVb <- sqrt(diag(svdVb$d)) %*% t(svdVb$u)
       dgVb <- diag(vout$Vb)
-      rmatC <- rmat %*% diag(sqrt(T * dgVb))
-      sqrtVbC <- sqrtVb %*% diag(1/sqrt(T * dgVb))
+      rmatC <- rmat %*% diag(sqrt(Tobs * dgVb))
+      sqrtVbC <- sqrtVb %*% diag(1/sqrt(Tobs * dgVb))
       lndetVb <- sum(log(svdVb$d))
-      lndetVbC <- lndetVb - sum(log(dgVb * T))
+      lndetVbC <- lndetVb - sum(log(dgVb * Tobs))
       ## schwarz <- rmat %*% svdVb$u %*% diag(1/sqrt(svdVb$d)) #below is more efficient version for large Vb
       ## schwarz <- (1/sqrt(svdVb$d)) * (t(svdVb$u) %*% rv)
     } else {                            #type="SVhtskd"
@@ -2753,11 +2746,11 @@ restrictVAR <-
       # KS note: is this correct?
       sqrtVb2 = svdVb$u %*% sqrt(diag(svdVb$d)) %*% t(svdVb$u)
       dgVb <- diag(Vb)
-      rmatC <- rmat %*% diag(sqrt(T * dgVb))
-      sqrtVbC <- sqrtVb %*% diag(1/sqrt(T *dgVb))
+      rmatC <- rmat %*% diag(sqrt(Tobs * dgVb))
+      sqrtVbC <- sqrtVb %*% diag(1/sqrt(Tobs *dgVb))
 
       lndetVb <- sum(log(svdVb$d))
-      lndetVbC <- lndetVb - sum(log(dgVb * T))
+      lndetVbC <- lndetVb - sum(log(dgVb * Tobs))
     }
 
     vr2 <- (sqrtVb2 %*% t(rmat))
@@ -2781,7 +2774,7 @@ restrictVAR <-
 
 
     if(type == "SVhtskd") {
-      vout$By <- tensor(A0i, vout$By, 2, 1)
+      vout$By <- tensor::tensor(A0i, vout$By, 2, 1)
       vout$Bx <- A0i %*% vout$Bx
     }
     stackedcf <- c(t(cbind(matrix(vout$By, nrow=neq), vout$Bx)))
@@ -2861,12 +2854,12 @@ rfrun <-
     ## for the unit root prior
     ybar <- apply(ydata[1:lags, ], 2, mean)
 
-    T <- dim(ydata)[1]
+    Tobs <- dim(ydata)[1]
     nv <- dim(ydata)[2]
     if (const) {
-      xdata <- cbind(xdata, matrix(1,T,1))
+      xdata <- cbind(xdata, matrix(1,Tobs,1))
     }
-    if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == T)
+    if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == Tobs)
     Tx <- dim(xdata)[1]
     nx <- dim(xdata)[2]
 
@@ -2948,26 +2941,25 @@ scaleplots <-
 
     ## END Preamble
 
-    require(grDevices)
 
     #### filename <- paste('/home/karthik/R/summer/macrofin/plotting','/plots/', filename,sep='')
 
     filename <- paste('plots/', filename,sep='')
     if (format == 'pdf'){
       filename <- paste(filename, '.pdf', sep = '')
-      pdf(filename, width = width, height = height)
-      color1 <- rgb(color1[1], color1[2], color1[3], 1)
-      color2 <- rgb(color2[1], color2[2], color2[3], 1)
+      grDevices::pdf(filename, width = width, height = height)
+      color1 <- grDevices::rgb(color1[1], color1[2], color1[3], 1)
+      color2 <- grDevices::rgb(color2[1], color2[2], color2[3], 1)
     } else if (format == 'eps'){
       filename <- paste(filename, '.eps', sep = '')
-      trellis.device(device="postscript", color = TRUE)
+      lattice::trellis.device(device="postscript", color = TRUE)
       ##setEPS()
-      postscript(filename, width = width, height = height)
+      grDevices::postscript(filename, width = width, height = height)
 
       ## Cannot do transparent colors, so here is a crude workaround
       alphafy <- function(col,alpha=1) {
         rr <- 1-alpha*(1-c(col/255))
-        return(rgb(rr[1],rr[2],rr[3]))
+        return(grDevices::rgb(rr[1],rr[2],rr[3]))
       }
       color <- alphafy(color, alpha)
 
@@ -3141,11 +3133,11 @@ scaleplots <-
 
 sim_model <-
   function(tvvout, ## output of optimization
-           lambda <- matrix(1,nv,6), ## - log variances
-           lmdp <- rep(10,6), ## number of periods in each regime
-           burn <- 0, ## number of periods in the first regime to run as "burn in"
-           y0 <- c(rep(0,nv*nlag),1), ## initial state
-           delta <- NULL ## variance modifiers
+           lambda = matrix(1,nv,6), ## - log variances
+           lmdp = rep(10,6), ## number of periods in each regime
+           burn = 0, ## number of periods in the first regime to run as "burn in"
+           y0 = c(rep(0,nv*nlag),1), ## initial state
+           delta = NULL ## variance modifiers
   ) {
 
     ## Generates fake data from our SVAR model
@@ -3289,13 +3281,13 @@ SVARhtskdmdd <-
   {
     if (is.null(dim(ydata)))  ydata <- matrix(ydata, ncol=1)
     ybar <- apply(ydata[1:lags, ], 2, mean)
-    T <- dim(ydata)[1]
+    Tobs <- dim(ydata)[1]
     nv <- dim(ydata)[2]
     if (const) {
-      xdata <- cbind(xdata, matrix(1,T,1))
+      xdata <- cbind(xdata, matrix(1,Tobs,1))
     }
     ## looks likely that const=FALSE, xdata=NULL case crashes.  (2012.9.24)
-    if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == T)
+    if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == Tobs)
     Tx <- dim(xdata)[1]
     nx <- dim(xdata)[2]
     vp <- varprior(nv,nx,lags,mnprior,vprior, urprior=urprior, ybar=ybar, mnstart = mnstart,cosprior = cosprior) # vp$: ydum,xdum,pbreaks
@@ -3313,24 +3305,24 @@ SVARhtskdmdd <-
 
     ## -------- set A0 for prior dummies, if required ------
     if (length(dim(A0)) == 3){
-      A0 <- abind(A0,apply(A0,1:2,mean),along=3)
+      A0 <- abind::abind(A0,apply(A0,1:2,mean),along=3)
     }
 
     ## --------------------- Tsigbrk assumed to be indexes into ydata matrix, not
-    ## --------------------- dates.  Conversion from dates and adding T done in bvarWrap3().
-    ## Tsigbrk <- c(invTime(Tsigbrk, ydata), T)            #dummy obs at end
+    ## --------------------- dates.  Conversion from dates and adding Tobs done in bvarWrap3().
+    ## Tsigbrk <- c(invTime(Tsigbrk, ydata), Tobs)            #dummy obs at end
 
-    ## var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1),
+    ## var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, Tobs, Tobs + vp$pbreaks), ncol=1),
     ## const=FALSE, lambda=lambda, mu=mu, ic=ic) # const is FALSE in this call because ones alread put into xdata
 
     ## var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum),
-    ##     breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
+    ##     breaks=matrix(c(breaks, Tobs, Tobs + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
     ##     mu=NULL, ic=ic, sigpar=list(A0=A0,lmd=lmd,Tsigbrk=Tsigbrk), cores = cores)
 
     ## ISSUE 7/27: lmdbar is not being used for the dummies! because of the way Tsigbrk is coded
     var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum),
-                  breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
-                  mu=NULL, ic=ic, sigpar=list(A0=A0,lmd=lmd,Tsigbrk=c(Tsigbrk,T)), cores = cores,
+                  breaks=matrix(c(breaks, Tobs, Tobs + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
+                  mu=NULL, ic=ic, sigpar=list(A0=A0,lmd=lmd,Tsigbrk=c(Tsigbrk,Tobs)), cores = cores,
                   oweights = oweights, drawbe = drawbe)
 
     if (is.null(var)) {
@@ -3383,7 +3375,7 @@ SVARhtskdmdd <-
       priorlmd <- cbind(lmd[ , 1], lmd[ , dim(lmd)[2]])
 
       if (length(dim(A0)) == 3){  # in case of time varying A0
-        priorA0 <- abind(A0[,,1],A0[,,dim(A0)[3]],along=3)
+        priorA0 <- abind::abind(A0[,,1],A0[,,dim(A0)[3]],along=3)
       } else {
         priorA0 <- A0
       }
@@ -3595,8 +3587,6 @@ TvvDir <-
 
     ## Libraries ----
 
-    library(parallel)
-
 
 
     ## Loading data ----
@@ -3626,7 +3616,7 @@ TvvDir <-
     ##Restrictions on A0, lmd by brute force (seed model has no restrictions)
 
     nVar <- dim(listData$Y)[2]
-    T <- dim(listData$Y)[1] - nLags
+    Tobs <- dim(listData$Y)[1] - nLags
 
     if (is.null(lcA0)) {
       lcA0 <- matrix(FALSE,nVar,nVar)
@@ -3664,7 +3654,7 @@ TvvDir <-
       tempAinv <- (t(chol(crossprod(seedrfmodel$u) / dim(seedrfmodel$u)[1]))) ##unscaled
 
       u <- seedrfmodel$u
-      regimes <- c(0, Tsigbrk - nLagsrf, T)
+      regimes <- c(0, Tsigbrk - nLagsrf, Tobs)
       nRegimes <- length(regimes) - 1
       seedLmd <- matrix(1, nVar, nRegimes)
 
