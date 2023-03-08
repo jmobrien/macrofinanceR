@@ -1,70 +1,71 @@
-applynl = function(mydata, nl){
+applynl <-
+  function(mydata, nl){
 
     ## applies a simple nonlinear transformation (see paper for details), and calculates
     ## appropriate jacobian term to put in likelihood (for correct model comparison, or
     ## inference over the nl parameters).
 
-######################################################################################
 
 
-    att = nl[1] ## lower treshold
-    ct = nl[2] ## upper
-    beta = nl[3] ## slope increase
-    iv = nl[4] ## which variable to worry about
-    ## alpha = nl[5] ## slope of the original log transformation (x-p) - ky
+    att <- nl[1] ## lower treshold
+    ct <- nl[2] ## upper
+    beta <- nl[3] ## slope increase
+    iv <- nl[4] ## which variable to worry about
+    ## alpha <- nl[5] ## slope of the original log transformation (x-p) - ky
 
-    iseries = mydata[,iv]
+    iseries <- mydata[,iv]
 
-    jterm = rep(0,length(iseries)) ## jacobian term
+    jterm <- rep(0,length(iseries)) ## jacobian term
 
 
 
     ## quadratic range
-    a1 = beta / (2 * (ct - att))
-    a2 = 1 - 2 * att * a1
-    a3 = att - a2 *att - a1 * att^2
-    
-    iseries[(iseries > att) & (iseries < ct)] =
-        a3 + a2 * (iseries[(iseries > att) & (iseries < ct)]) +
-        a1 * (iseries[(iseries > att) & (iseries < ct)])^2
+    a1 <- beta / (2 * (ct - att))
+    a2 <- 1 - 2 * att * a1
+    a3 <- att - a2 *att - a1 * att^2
 
-    jterm = sum(log(a2 + 2 * a1 * (mydata[(mydata[,iv] > att) & (mydata[,iv] < ct),iv])))
+    iseries[(iseries > att) & (iseries < ct)] =
+      a3 + a2 * (iseries[(iseries > att) & (iseries < ct)]) +
+      a1 * (iseries[(iseries > att) & (iseries < ct)])^2
+
+    jterm <- sum(log(a2 + 2 * a1 * (mydata[(mydata[,iv] > att) & (mydata[,iv] < ct),iv])))
 
     ## upper linear range
-    ct2 = a3 + a2*ct + a1 * ct^2 ## f(ct)
+    ct2 <- a3 + a2*ct + a1 * ct^2 ## f(ct)
 
-    iseries[(mydata[,iv] >= ct)] = (1+beta) * (iseries[(mydata[,iv] >= ct)] - ct) + ct2
-    jterm = jterm + sum(mydata[,iv] > ct) * log(1+beta)
+    iseries[(mydata[,iv] >= ct)] <- (1+beta) * (iseries[(mydata[,iv] >= ct)] - ct) + ct2
+    jterm <- jterm + sum(mydata[,iv] > ct) * log(1+beta)
 
     ## pdf('~/check.pdf')
-    ## ## irange = (mydata[,iv] > att) & (mydata[,iv] < ct)
+    ## ## irange <- (mydata[,iv] > att) & (mydata[,iv] < ct)
     ## ## plot(mydata[irange,iv],iseries[irange])
-    ## plot(mydata[,iv],iseries,type = 'l')
+    ## plot(mydata[,iv],iseries,type <- 'l')
     ## dev.off()
 
 
-    mydata[,iv] = iseries
+    mydata[,iv] <- iseries
 
     return(list(data = mydata, jterm = jterm))
-}
+  }
 
 
 ## Allows for full regime switching for A0
 ## Karthik Sastry
 ## July 1 2019
 
-bvarwrap_tvA = function(x, verbose=FALSE, listData = NULL, nLags = 2,
-    lcA0 = NULL, lcLmd = NULL, lmdblock = NULL,
-    Tsigbrk = NULL, pparams = NULL, nVarcores = 1, dprior = TRUE,
-    hparam_nl = rep(0,5), nlt = nlt, hparam = rep(0,7),
-    lmdmean = FALSE,lmdPrior = NULL,
-    oweights = NULL, drawbe = FALSE) {
+bvarwrap_tvA <-
+  function(x, verbose=FALSE, listData = NULL, nLags = 2,
+           lcA0 = NULL, lcLmd = NULL, lmdblock = NULL,
+           Tsigbrk = NULL, pparams = NULL, nVarcores = 1, dprior = TRUE,
+           hparam_nl = rep(0,5), nlt = nlt, hparam = rep(0,7),
+           lmdmean = FALSE,lmdPrior = NULL,
+           oweights = NULL, drawbe = FALSE) {
 
     ## Main function for calculating log posterior used in Metropolis step
 
     ## Implements a Dirichlet prior on the variances, and assumes A0 diagonal is estimated
 
-    ## -------------------- INPUTS --------------------
+    ## -------------------- INPUTS --------------------X
     ## x: vector with all elements of A0, Lambda
     ## verbose: flag of whether to report more than the negative LLH. FALSE is useful
     ## for (some) Metropolis Hastings
@@ -109,139 +110,131 @@ bvarwrap_tvA = function(x, verbose=FALSE, listData = NULL, nLags = 2,
     ## if not verbose: just lh, which is the negative log posterior
     ## if verbose: lh plus a bunch of other stuff from the VAR calculation. You want this
     ##             for the normal mixture model (because it has the residuals and A_i coefficients)
-    
-    ## END PREAMBLE
-####################################################################################################################################################################################
 
-######################################
+    ## END PREAMBLE
+
     ## Preparing and formatting data
-######################################
-    
+
     ## Things that don't change, like nVar and T, /should/ be bound outside
     ## the iteration, but performance gains are probably small
 
-    nSig = length(Tsigbrk)              #number of regimes
-    nVar = dim(listData$Y)[2]           #number of variables
-    T = dim(listData$Y)[1]
+    nSig <- length(Tsigbrk)              #number of regimes
+    nVar <- dim(listData$Y)[2]           #number of variables
+    T <- dim(listData$Y)[1]
 
-    A = array(0, c(nVar, nVar, nSig))   #different A matrix for each regime
-    
-    varnames = dimnames(listData$Y)[[2]]	
-    
-######
-    ## Preparing A
-######
-    
-    nA = sum(lcA0)         #number of non-fixed parameters, per regime
-    Acoef = matrix(x[1:(nA*nSig)],nrow=nA,ncol=nSig) #A parameters per regime
+    A <- array(0, c(nVar, nVar, nSig))   #different A matrix for each regime
+
+    varnames <- dimnames(listData$Y)[[2]]
+
+
+    ## Preparing A ----
+
+    nA <- sum(lcA0)         #number of non-fixed parameters, per regime
+    Acoef <- matrix(x[1:(nA*nSig)],nrow=nA,ncol=nSig) #A parameters per regime
 
     for (iSig in 1:nSig){                            # fill A matrix
-        Amat = matrix(0,nVar,nVar)
-        Amat[lcA0] = Acoef[,iSig]
-        A[,,iSig] = Amat
+      Amat <- matrix(0,nVar,nVar)
+      Amat[lcA0] <- Acoef[,iSig]
+      A[,,iSig] <- Amat
     }
 
-    ## dimnames(A) = list(varnames, varnames)
-    nv = dim(A)[1]
+    ## dimnames(A) <- list(varnames, varnames)
+    nv <- dim(A)[1]
 
-######
-    ## Prior on A
-######
-    
+    ## Prior on A ----
+
     ## Adjusts for number of non-restircted values in A
-    allh = rep(0,nSig)
-    nP = sum(lcA0)                      # number of parameters
+    allh <- rep(0,nSig)
+    nP <- sum(lcA0)                      # number of parameters
     for (iSig in 1:nSig){               # looping over regimes
 
-        Ascore = (A[,,iSig] - diag(nVar) * 100)^2 / 4e4
-        
-        allh[iSig] = -.5 * sum(Ascore[lcA0]) - # subset to nonzero coefficients
-            .5 * nP * (log (2 * pi) + log(200))
+      Ascore <- (A[,,iSig] - diag(nVar) * 100)^2 / 4e4
+
+      allh[iSig] <- -.5 * sum(Ascore[lcA0]) - # subset to nonzero coefficients
+        .5 * nP * (log (2 * pi) + log(200))
     }
 
-    allh = sum(allh)                    # summing over all variance regimes
+    allh <- sum(allh)                    # summing over all variance regimes
 
 
-    
-######
-    ## Preparing lmd
-######
-    
+
+    ## Preparing lmd ----
+
     if (length(x) == nA * nSig){
-        ## No variance parameters to estimate
-        hasLmd = FALSE
-        lmd = matrix(1, nVar, nSig)
+      ## No variance parameters to estimate
+      hasLmd <- FALSE
+      lmd <- matrix(1, nVar, nSig)
 
-        nLmd = 0
-        
+      nLmd <- 0
+
     } else {
-        ## Fill in variance parameters
-        hasLmd = TRUE
+      ## Fill in variance parameters
+      hasLmd <- TRUE
 
-        nLmd = sum(lcLmd)                   # maximum number of variance parameters to estimate
-        lmd = matrix(0, nVar, nSig)
+      nLmd <- sum(lcLmd)                   # maximum number of variance parameters to estimate
+      lmd <- matrix(0, nVar, nSig)
 
-        lmd[lcLmd] = x[(nA*nSig) + (1 : nLmd)]
+      lmd[lcLmd] <- x[(nA*nSig) + (1 : nLmd)]
 
 
-        ## This is a streamlined way of setting certain lambda not to change between periods
-        if (!is.null(lmdblock)) {
-            nBlocks = dim(lmdblock)[3]
-            for (iBlock in 1:nBlocks){
-                lmd[lmdblock[,,iBlock]] = (lmd[lmdblock[,,iBlock]])[1]
-                ##first of block was filled in
-            }
+      ## This is a streamlined way of setting certain lambda not to change between periods
+      if (!is.null(lmdblock)) {
+        nBlocks <- dim(lmdblock)[3]
+        for (iBlock in 1:nBlocks){
+          lmd[lmdblock[,,iBlock]] <- (lmd[lmdblock[,,iBlock]])[1]
+          ##first of block was filled in
         }
+      }
 
-        ## last period's variances are fixed, so (arithmetic) average is 1
-        ## ## lmd[,nSig] = -log(nSig - apply(exp(-lmd[,1:(nSig-1)]),1,sum))
-        lmd[,nSig] = nSig - apply(lmd[,1:(nSig-1),drop=FALSE],1,sum)
+      ## last period's variances are fixed, so (arithmetic) average is 1
+      ## ## lmd[,nSig] <- -log(nSig - apply(exp(-lmd[,1:(nSig-1)]),1,sum))
+      lmd[,nSig] <- nSig - apply(lmd[,1:(nSig-1),drop=FALSE],1,sum)
 
-        ## prior on lmd is applied later in the code
+      ## prior on lmd is applied later in the code
 
     }
 
-    
 
-    
+
+
     ## possible hyperparameters for the non-linear transformation
-    lastvalue = nA + nLmd ## for picking out extra params
-    
+    lastvalue <- nA + nLmd ## for picking out extra params
+
     ## if (length(x) > (nA + nLmd)){
     if (any(hparam_nl > 0)) { ## better to check this, so we can still optimize over prior params
 
-        ## input is A, C, beta, index of param
-        ## never put a prior on the last one! that would be silly
-        ## dont change the 5th either, because its applied outside the function
-        
-        ## nlt[hparam_nl > 0] = x[-(1:(nA + nLmd))]
-        nlt[hparam_nl > 0] = x[lastvalue + 1:(sum(hparam_nl > 0))]
-        lastvalue = lastvalue + sum(hparam_nl > 0)
+      ## input is A, C, beta, index of param
+      ## never put a prior on the last one! that would be silly
+      ## dont change the 5th either, because its applied outside the function
 
-        nlflag = TRUE
+      ## nlt[hparam_nl > 0] <- x[-(1:(nA + nLmd))]
+      nlt[hparam_nl > 0] <- x[lastvalue + 1:(sum(hparam_nl > 0))]
+      lastvalue <- lastvalue + sum(hparam_nl > 0)
 
-        nlout = applynl(listData$Y, nlt) ## apply nl transform
+      nlflag <- TRUE
 
-        listData$Y = nlout$data ## new data
-        jterm = nlout$jterm
+      nlout <- applynl(listData$Y, nlt) ## apply nl transform
 
-        pterm = sum(hparam_nl * nlt) ## neg exponential
-        
+      listData$Y <- nlout$data ## new data
+      jterm <- nlout$jterm
+
+      pterm <- sum(hparam_nl * nlt) ## neg exponential
+
     } else {
-        nlflag = FALSE ## no nonlinear transformation
-        jterm = 0
-        pterm = 0
+      nlflag <- FALSE ## no nonlinear transformation
+      jterm <- 0
+      pterm <- 0
     }
 
     if (any(hparam > 0)){ ## hyperparameters
-        
-        ## (MN tight, MN decay, UR lambda, UR mu,
-        ## Cos tight, cos smooth, cos damp
+
+      ## (MN tight, MN decay, UR lambda, UR mu,
+      ## Cos tight, cos smooth, cos damp
 
 
-        ## asume there is one of mn or cos prior
-        if (!is.null(pparams$cosprior)){
-            pv = c(0,
+      ## asume there is one of mn or cos prior
+      if (!is.null(pparams$cosprior)){
+        pv <- c(0,
                 0,
                 pparams$urprior$lambda,
                 pparams$urprior$mu,
@@ -249,18 +242,18 @@ bvarwrap_tvA = function(x, verbose=FALSE, listData = NULL, nLags = 2,
                 pparams$cosprior$smooth,
                 pparams$cosprior$damp)
 
-            pv[(hparam > 0)] = x[lastvalue + 1:(sum(hparam > 0))]
-            ## pparams$mnprior$tight = pv[1]
-            ## pparams$mnprior$decay = pv[2]
-            pparams$urprior$lambda = pv[3]
-            pparams$urprior$mu = pv[4]
-            pparams$cosprior$tight = pv[5]
-            pparams$cosprior$smooth = pv[6]
-            pparams$cosprior$damp = pv[7]
+        pv[(hparam > 0)] <- x[lastvalue + 1:(sum(hparam > 0))]
+        ## pparams$mnprior$tight <- pv[1]
+        ## pparams$mnprior$decay <- pv[2]
+        pparams$urprior$lambda <- pv[3]
+        pparams$urprior$mu <- pv[4]
+        pparams$cosprior$tight <- pv[5]
+        pparams$cosprior$smooth <- pv[6]
+        pparams$cosprior$damp <- pv[7]
 
-        } else { ## asume mn prior
+      } else { ## asume mn prior
 
-            pv = c(pparams$mnprior$tight,
+        pv <- c(pparams$mnprior$tight,
                 pparams$mnprior$decay,
                 pparams$urprior$lambda,
                 pparams$urprior$mu,
@@ -268,144 +261,144 @@ bvarwrap_tvA = function(x, verbose=FALSE, listData = NULL, nLags = 2,
                 0,
                 0)
 
-            pv[(hparam > 0)] = x[lastvalue + 1:(sum(hparam > 0))]
-            pparams$mnprior$tight = pv[1]
-            pparams$mnprior$decay = pv[2]
-            pparams$urprior$lambda = pv[3]
-            pparams$urprior$mu = pv[4]
-            ## pparams$cosprior$tight = pv[5]
-            ## pparams$cosprior$smooth = pv[6]
-            ## pparams$cosprior$damp = pv[7]
+        pv[(hparam > 0)] <- x[lastvalue + 1:(sum(hparam > 0))]
+        pparams$mnprior$tight <- pv[1]
+        pparams$mnprior$decay <- pv[2]
+        pparams$urprior$lambda <- pv[3]
+        pparams$urprior$mu <- pv[4]
+        ## pparams$cosprior$tight <- pv[5]
+        ## pparams$cosprior$smooth <- pv[6]
+        ## pparams$cosprior$damp <- pv[7]
 
-        }
-        
+      }
 
-        
-        ## if (!is.null(pparams$mnprior)){
-        ##     pparams$mnprior$tight  = pv[1]
-        ##     pparams$mnprior$decay  = pv[2]
-        ## } else if (!is.null(pparams$urprior)){
-        ##     pparams$urprior$lambda = pv[3]
-        ##     pparams$urprior$mu     = pv[4]
-        ## }
 
-        prior_hp = sum(hparam * pv) ## neg exponential density
-        badflag = any(pv < 0)
+
+      ## if (!is.null(pparams$mnprior)){
+      ##     pparams$mnprior$tight  <- pv[1]
+      ##     pparams$mnprior$decay  <- pv[2]
+      ## } else if (!is.null(pparams$urprior)){
+      ##     pparams$urprior$lambda <- pv[3]
+      ##     pparams$urprior$mu     <- pv[4]
+      ## }
+
+      prior_hp <- sum(hparam * pv) ## neg exponential density
+      badflag <- any(pv < 0)
     } else {
-        prior_hp = 0
-        badflag = FALSE
+      prior_hp <- 0
+      badflag <- FALSE
     }
 
-    
-    
-######################################
-    ## Estimating the model
-######################################
 
-    if (is.null(pparams$mnstart)) pparams$mnstart = 1
+
+    ## Estimating the model ----
+
+
+    if (is.null(pparams$mnstart)) pparams$mnstart <- 1
 
     if (any(lmd < 0)){
-        ## trash this draw, variances negative
+      ## trash this draw, variances negative
 
-        lh = 1e5
-        vout = NULL
+      lh <- 1e5
+      vout <- NULL
 
-        if (!verbose){
-            return(lh) #### dont need anything else
-        } else {
-            return(list(lh = lh))
-        }
-        
+      if (!verbose){
+        return(lh) #### dont need anything else
+      } else {
+        return(list(lh <- lh))
+      }
+
 
     } else if(nlflag && any(nlt < 0)){
-        ## none of the nonlinear transformation parameters can be negative
-        lh = 1e5
-        vout = NULL
-        ## return(lh)
+      ## none of the nonlinear transformation parameters can be negative
+      lh <- 1e5
+      vout <- NULL
+      ## return(lh)
 
-        if (!verbose){
-            return(lh) #### dont need anything else
-        } else {
-            return(list(lh = lh))
-        }
-        
+      if (!verbose){
+        return(lh) #### dont need anything else
+      } else {
+        return(list(lh <- lh))
+      }
+
 
     } else if(badflag){
-        ## hyperparameter cannot be negative
-        lh = 1e5
-        vout = NULL
-        ## return(lh)
+      ## hyperparameter cannot be negative
+      lh <- 1e5
+      vout <- NULL
+      ## return(lh)
 
-        if (!verbose){
-            return(lh) #### dont need anything else
-        } else {
-            return(list(lh = lh))
-        }
-        
+      if (!verbose){
+        return(lh) #### dont need anything else
+      } else {
+        return(list(lh <- lh))
+      }
+
     } else { #### proceed normally
-        
-        vout = SVARhtskdmdd(listData$Y, lags = nLags, xdata = NULL, const = TRUE, A0 = A,
-            lmd = -log(lmd), Tsigbrk = Tsigbrk,
-            urprior = pparams$urprior, mnprior = pparams$mnprior,
-            vprior = pparams$vprior,
-            cosprior = pparams$cosprior,
-            mnstart = pparams$mnstart, train = 0, cores = nVarcores,
-            lmdmean = FALSE, oweights = oweights, drawbe = drawbe)
-        
-        lh = -sum(vout$w)
+
+      vout <- SVARhtskdmdd(listData$Y, lags = nLags, xdata = NULL, const = TRUE, A0 = A,
+                           lmd = -log(lmd), Tsigbrk = Tsigbrk,
+                           urprior = pparams$urprior, mnprior = pparams$mnprior,
+                           vprior = pparams$vprior,
+                           cosprior = pparams$cosprior,
+                           mnstart = pparams$mnstart, train = 0, cores = nVarcores,
+                           lmdmean = FALSE, oweights = oweights, drawbe = drawbe)
+
+      lh <- -sum(vout$w)
 
 
 
-        ## dirichlet prior
-        if (hasLmd == TRUE){
-            lpL = apply(log(lmd) - log(nSig),2,sum) - lgamma(2 * nSig)
-            lplmd = sum(lpL) - (nSig-1) * log(nSig)
-        } else {
-            ## No lmd estimated for this model
-            lplmd = 0
-        }
-        
-        
-        ## Prior that selects against large eigenvalues
-        ## currently not implemented
+      ## dirichlet prior
+      if (hasLmd == TRUE){
+        lpL <- apply(log(lmd) - log(nSig),2,sum) - lgamma(2 * nSig)
+        lplmd <- sum(lpL) - (nSig-1) * log(nSig)
+      } else {
+        ## No lmd estimated for this model
+        lplmd <- 0
+      }
 
-        ev = 0
-        ##might look something like:
-        ## ev <- eigen(sysmat(vout$By))$values
-        ## ev <- sum(abs(ev[abs(ev) > 1] - 1))^2*1e3 ##(so one root of 1.03 penalized by .9 (weak)
-        ##but it could mess up MCMC logic
 
-        lh = lh + ev - lplmd - allh ##marginal posterior | lmd, A
-        lh = lh - jterm + pterm ## subtract the jacobian, because negative llh
-        lh = lh + prior_hp ## prior on prior parameters
+      ## Prior that selects against large eigenvalues
+      ## currently not implemented
+
+      ev <- 0
+      ##might look something like:
+      ## ev <- eigen(sysmat(vout$By))$values
+      ## ev <- sum(abs(ev[abs(ev) > 1] - 1))^2*1e3 ##(so one root of 1.03 penalized by .9 (weak)
+      ##but it could mess up MCMC logic
+
+      lh <- lh + ev - lplmd - allh ##marginal posterior | lmd, A
+      lh <- lh - jterm + pterm ## subtract the jacobian, because negative llh
+      lh <- lh + prior_hp ## prior on prior parameters
 
     }
-    
+
     if(verbose) {
-        ## grab standardized residuals
-        ustd <- vout$var$u
-        ulevel <- vout$var$uraw ## this is always null in the rfvar3 output with non-null sigpar
+      ## grab standardized residuals
+      ustd <- vout$var$u
+      ulevel <- vout$var$uraw ## this is always null in the rfvar3 output with non-null sigpar
 
-        return(list(lh=lh, vout=vout, A=A, lambda = lmd, llmd = -log(lmd), u=ulevel,
-                    ustd=ustd, asig = pparams$asig, x = x, lplmd = lplmd, allh = allh)) ##llmd included because exp(-lmd) might lose precision.
-        
+      return(list(lh=lh, vout=vout, A=A, lambda = lmd, llmd = -log(lmd), u=ulevel,
+                  ustd=ustd, asig = pparams$asig, x = x, lplmd = lplmd, allh = allh)) ##llmd included because exp(-lmd) might lose precision.
+
     } else {
-        ## print(lh)
-        return(lh)
+      ## print(lh)
+      return(lh)
 
     }
-    
-}
+
+  }
 
 
 
 
-bvarwrap5 = function(x, verbose=FALSE, listData = NULL, nLags = 2,
-                      lcA0 = NULL, lcLmd = NULL, lmdblock = NULL,
-                      Tsigbrk = NULL, pparams = NULL, nVarcores = 1, dprior = TRUE,
-                      hparam_nl = rep(0,5), nlt = nlt, hparam = rep(0,7),
-                      lmdmean = FALSE,lmdPrior = NULL,
-                      oweights = NULL, drawbe = FALSE) {
+bvarwrap5 <-
+  function(x, verbose=FALSE, listData = NULL, nLags = 2,
+           lcA0 = NULL, lcLmd = NULL, lmdblock = NULL,
+           Tsigbrk = NULL, pparams = NULL, nVarcores = 1, dprior = TRUE,
+           hparam_nl = rep(0,5), nlt = nlt, hparam = rep(0,7),
+           lmdmean = FALSE,lmdPrior = NULL,
+           oweights = NULL, drawbe = FALSE) {
 
     ## Main function for calculating log posterior used in Metropolis step
 
@@ -456,393 +449,377 @@ bvarwrap5 = function(x, verbose=FALSE, listData = NULL, nLags = 2,
     ## if not verbose: just lh, which is the negative log posterior
     ## if verbose: lh plus a bunch of other stuff from the VAR calculation. You want this
     ##             for the normal mixture model (because it has the residuals and A_i coefficients)
-    
+
     ## END PREAMBLE
 
-##################################################################################################################################################
 
 
-#######
-     ## Preparing and formatting data
-#######
+    ## Preparing and formatting data ----
 
-    
     ## Things that don't change, like nVar and T, /should/ be bound outside
     ## the iteration, but performance gains are probably small
-    
-    nVar = dim(listData$Y)[2]
-    T = dim(listData$Y)[1]
-    A = matrix(0, nVar, nVar)
-    varnames = dimnames(listData$Y)[[2]]	
-    
-######
-    ## Preparing A
-######
-    
-    diag(A) = 1
-    nA = sum(lcA0) ##number of non-fixed parameters
-    A[lcA0] = x[1:nA]	
-    dimnames(A) = list(varnames, varnames)
-    nv = dim(A)[1]
 
-######
-    ## Prior on A
-######
-    
+    nVar <- dim(listData$Y)[2]
+    T <- dim(listData$Y)[1]
+    A <- matrix(0, nVar, nVar)
+    varnames <- dimnames(listData$Y)[[2]]
+
+    ## Preparing A ----
+
+    diag(A) <- 1
+    nA <- sum(lcA0) ##number of non-fixed parameters
+    A[lcA0] <- x[1:nA]
+    dimnames(A) <- list(varnames, varnames)
+    nv <- dim(A)[1]
+
+    ## Prior on A ----
+
     ## Gaussian with mean 100, variance 200
     ## Prior scaling: correct if all nVar^2 parameters are non-zero
-    allh = -.5 * sum((A - diag(nVar) * 100)^2 / 4e4) -
-        nVar^2 * (log (2 * pi) / 2 + log(200))
+    allh <- -.5 * sum((A - diag(nVar) * 100)^2 / 4e4) -
+      nVar^2 * (log (2 * pi) / 2 + log(200))
 
-######
-    ## Preparing lmd
-######
-    
-    nLmd = sum(lcLmd)
-    nSig = length(Tsigbrk)
+    ## Preparing lmd ----
+
+    nLmd <- sum(lcLmd)
+    nSig <- length(Tsigbrk)
     if (nLmd > 0){
-        ## Fill in lambda
-        lmd = matrix(0, nVar, nSig)
-        lmd[lcLmd] = x[nA + (1 : nLmd)]
+      ## Fill in lambda
+      lmd <- matrix(0, nVar, nSig)
+      lmd[lcLmd] <- x[nA + (1 : nLmd)]
 
 
-        ## This is a streamlined way of setting certain lambda not to change between periods
-        if (!is.null(lmdblock)) {
-            nBlocks = dim(lmdblock)[3]
-            for (iBlock in 1:nBlocks){
-                lmd[lmdblock[,,iBlock]] = (lmd[lmdblock[,,iBlock]])[1]
-                ##first of block was filled in
-            }
+      ## This is a streamlined way of setting certain lambda not to change between periods
+      if (!is.null(lmdblock)) {
+        nBlocks <- dim(lmdblock)[3]
+        for (iBlock in 1:nBlocks){
+          lmd[lmdblock[,,iBlock]] <- (lmd[lmdblock[,,iBlock]])[1]
+          ##first of block was filled in
         }
+      }
 
-        ## last period's variances are fixed, so (arithmetic) average is 1
-        ## ## lmd[,nSig] = -log(nSig - apply(exp(-lmd[,1:(nSig-1)]),1,sum))
-        lmd[,nSig] = nSig - apply(lmd[,1:(nSig-1),drop=FALSE],1,sum)
+      ## last period's variances are fixed, so (arithmetic) average is 1
+      ## ## lmd[,nSig] <- -log(nSig - apply(exp(-lmd[,1:(nSig-1)]),1,sum))
+      lmd[,nSig] <- nSig - apply(lmd[,1:(nSig-1),drop=FALSE],1,sum)
 
 
-        ## Calculate prior for lmd
-        ## Dirichlet(2) for each equation
-        lpL = apply(log(lmd) - log(nSig),2,sum) - lgamma(2 * nSig)
-        lplmd = sum(lpL) - (nSig-1) * log(nSig)
+      ## Calculate prior for lmd
+      ## Dirichlet(2) for each equation
+      lpL <- apply(log(lmd) - log(nSig),2,sum) - lgamma(2 * nSig)
+      lplmd <- sum(lpL) - (nSig-1) * log(nSig)
 
     } else {
-        ## lmd = 1; no prior
-        lmd = matrix(1, nVar, nSig)
-        lplmd = 0
+      ## lmd <- 1; no prior
+      lmd <- matrix(1, nVar, nSig)
+      lplmd <- 0
     }
 
-    
+
     ## possible hyperparameters for the non-linear transformation
-    lastvalue = nA + nLmd ## for picking out extra params
-    
+    lastvalue <- nA + nLmd ## for picking out extra params
+
     if (any(hparam_nl > 0)) { # Enter loop if any hyper parameters provided
 
-        ## input is A, C, beta, index of param
-        ## never put a prior on the last one! that would be silly
-        ## dont change the 5th either, because its applied outside the function
-        
-        ## nlt[hparam_nl > 0] = x[-(1:(nA + nLmd))]
-        nlt[hparam_nl > 0] = x[lastvalue + 1:(sum(hparam_nl > 0))]
-        lastvalue = lastvalue + sum(hparam_nl > 0)
+      ## input is A, C, beta, index of param
+      ## never put a prior on the last one! that would be silly
+      ## dont change the 5th either, because its applied outside the function
 
-        nlflag = TRUE
+      ## nlt[hparam_nl > 0] <- x[-(1:(nA + nLmd))]
+      nlt[hparam_nl > 0] <- x[lastvalue + 1:(sum(hparam_nl > 0))]
+      lastvalue <- lastvalue + sum(hparam_nl > 0)
 
-        nlout = applynl(listData$Y, nlt) ## apply nl transform
+      nlflag <- TRUE
 
-        listData$Y = nlout$data ## new data
-        jterm = nlout$jterm
+      nlout <- applynl(listData$Y, nlt) ## apply nl transform
 
-        pterm = sum(hparam_nl * nlt) ## neg exponential
-        
+      listData$Y <- nlout$data ## new data
+      jterm <- nlout$jterm
+
+      pterm <- sum(hparam_nl * nlt) ## neg exponential
+
     } else {
-        nlflag = FALSE ## no nonlinear transformation
-        jterm = 0
-        pterm = 0
+      nlflag <- FALSE ## no nonlinear transformation
+      jterm <- 0
+      pterm <- 0
     }
 
     if (any(hparam > 0)){ ## hyperparameters
-        
-        ## (MN tight, MN decay, UR lambda, UR mu,
-        ## Cos tight, cos smooth, cos damp)
+
+      ## (MN tight, MN decay, UR lambda, UR mu,
+      ## Cos tight, cos smooth, cos damp)
 
 
-        ## asume there is one of mn or cos prior
-        if (!is.null(pparams$cosprior)){
-            pv = c(0,
-                   0,
-                   pparams$urprior$lambda,
-                   pparams$urprior$mu,
-                   pparams$cosprior$tight,
-                   pparams$cosprior$smooth,
-                   pparams$cosprior$damp)
+      ## asume there is one of mn or cos prior
+      if (!is.null(pparams$cosprior)){
+        pv <- c(0,
+                0,
+                pparams$urprior$lambda,
+                pparams$urprior$mu,
+                pparams$cosprior$tight,
+                pparams$cosprior$smooth,
+                pparams$cosprior$damp)
 
-            pv[(hparam > 0)] = x[lastvalue + 1:(sum(hparam > 0))]
-            ## pparams$mnprior$tight = pv[1]
-            ## pparams$mnprior$decay = pv[2]
-            pparams$urprior$lambda = pv[3]
-            pparams$urprior$mu = pv[4]
-            pparams$cosprior$tight = pv[5]
-            pparams$cosprior$smooth = pv[6]
-            pparams$cosprior$damp = pv[7]
+        pv[(hparam > 0)] <- x[lastvalue + 1:(sum(hparam > 0))]
+        ## pparams$mnprior$tight <- pv[1]
+        ## pparams$mnprior$decay <- pv[2]
+        pparams$urprior$lambda <- pv[3]
+        pparams$urprior$mu <- pv[4]
+        pparams$cosprior$tight <- pv[5]
+        pparams$cosprior$smooth <- pv[6]
+        pparams$cosprior$damp <- pv[7]
 
-        } else { ## asume mn prior
+      } else { ## asume mn prior
 
-            pv = c(pparams$mnprior$tight,
-                   pparams$mnprior$decay,
-                   pparams$urprior$lambda,
-                   pparams$urprior$mu,
-                   0,
-                   0,
-                   0)
+        pv <- c(pparams$mnprior$tight,
+                pparams$mnprior$decay,
+                pparams$urprior$lambda,
+                pparams$urprior$mu,
+                0,
+                0,
+                0)
 
-            pv[(hparam > 0)] = x[lastvalue + 1:(sum(hparam > 0))]
-            pparams$mnprior$tight = pv[1]
-            pparams$mnprior$decay = pv[2]
-            pparams$urprior$lambda = pv[3]
-            pparams$urprior$mu = pv[4]
-            ## pparams$cosprior$tight = pv[5]
-            ## pparams$cosprior$smooth = pv[6]
-            ## pparams$cosprior$damp = pv[7]
+        pv[(hparam > 0)] <- x[lastvalue + 1:(sum(hparam > 0))]
+        pparams$mnprior$tight <- pv[1]
+        pparams$mnprior$decay <- pv[2]
+        pparams$urprior$lambda <- pv[3]
+        pparams$urprior$mu <- pv[4]
+        ## pparams$cosprior$tight <- pv[5]
+        ## pparams$cosprior$smooth <- pv[6]
+        ## pparams$cosprior$damp <- pv[7]
 
-        }
-               
+      }
 
-          
 
-        prior_hp = sum(hparam * pv) ## neg exponential density
-        badflag = any(pv < 0)
+
+
+      prior_hp <- sum(hparam * pv) ## neg exponential density
+      badflag <- any(pv < 0)
     } else {
-        prior_hp = 0
-        badflag = FALSE
+      prior_hp <- 0
+      badflag <- FALSE
     }
 
-        
-        
-######################################
-    ## Estimating the model
-######################################
 
-    if (is.null(pparams$mnstart)) pparams$mnstart = 1
+
+    ## Estimating the model ----
+
+    if (is.null(pparams$mnstart)) pparams$mnstart <- 1
 
     if (any(lmd < 0)){
-        ## trash this draw, variances negative
+      ## trash this draw, variances negative
 
-        lh = 1e5
-        vout = NULL
+      lh <- 1e5
+      vout <- NULL
 
-        if (!verbose){
-            return(lh) #### dont need anything else
-        } else {
-            return(list(lh = lh))
-        }
-        
+      if (!verbose){
+        return(lh) #### dont need anything else
+      } else {
+        return(list(lh = lh))
+      }
+
 
     } else if(nlflag && any(nlt < 0)){
-        ## none of the nonlinear transformation parameters can be negative
-        lh = 1e5
-        vout = NULL
-        ## return(lh)
+      ## none of the nonlinear transformation parameters can be negative
+      lh <- 1e5
+      vout <- NULL
+      ## return(lh)
 
-        if (!verbose){
-            return(lh) #### dont need anything else
-        } else {
-            return(list(lh = lh))
-        }
-        
+      if (!verbose){
+        return(lh) #### dont need anything else
+      } else {
+        return(list(lh <- lh))
+      }
+
 
     } else if(badflag){
-        ## hyperparameter cannot be negative
-        lh = 1e5
-        vout = NULL
-        ## return(lh)
+      ## hyperparameter cannot be negative
+      lh <- 1e5
+      vout <- NULL
+      ## return(lh)
 
-        if (!verbose){
-            return(lh) #### dont need anything else
-        } else {
-            return(list(lh = lh))
-        }
-        
+      if (!verbose){
+        return(lh) #### dont need anything else
+      } else {
+        return(list(lh = lh))
+      }
+
     } else { #### proceed normally
-        
-        vout = SVARhtskdmdd(listData$Y, lags = nLags, xdata = NULL, const = TRUE, A0 = A,
-                            lmd = -log(lmd), Tsigbrk = Tsigbrk,
-                            urprior = pparams$urprior, mnprior = pparams$mnprior,
-                            vprior = pparams$vprior,
-                            cosprior = pparams$cosprior,
-                            mnstart = pparams$mnstart, train = 0, cores = nVarcores,
-                            lmdmean = FALSE, oweights = oweights, drawbe = drawbe)
-        
-        lh = -sum(vout$w)
-        
-        ## Prior that selects against large eigenvalues
-        ##currently not implemented
-        ev = 0
-        ##might look something like:
-        ## ev <- eigen(sysmat(vout$By))$values
-        ## ev <- sum(abs(ev[abs(ev) > 1] - 1))^2*1e3 ##(so one root of 1.03 penalized by .9 (weak)
-        ##but it could mess up MCMC logic
 
-        ## print(lplmd)
-        ##print(min(lmd))
-        
-        lh = lh + ev - lplmd - allh ##marginal posterior | lmd, A
-        lh = lh - jterm + pterm ## subtract the jacobian, because negative llh
-        lh = lh + prior_hp ## prior on prior paraemters
+      vout <- SVARhtskdmdd(listData$Y, lags = nLags, xdata = NULL, const = TRUE, A0 = A,
+                           lmd = -log(lmd), Tsigbrk = Tsigbrk,
+                           urprior = pparams$urprior, mnprior = pparams$mnprior,
+                           vprior = pparams$vprior,
+                           cosprior = pparams$cosprior,
+                           mnstart = pparams$mnstart, train = 0, cores = nVarcores,
+                           lmdmean = FALSE, oweights = oweights, drawbe = drawbe)
+
+      lh <- -sum(vout$w)
+
+      ## Prior that selects against large eigenvalues
+      ##currently not implemented
+      ev <- 0
+      ##might look something like:
+      ## ev <- eigen(sysmat(vout$By))$values
+      ## ev <- sum(abs(ev[abs(ev) > 1] - 1))^2*1e3 ##(so one root of 1.03 penalized by .9 (weak)
+      ##but it could mess up MCMC logic
+
+      ## print(lplmd)
+      ##print(min(lmd))
+
+      lh <- lh + ev - lplmd - allh ##marginal posterior | lmd, A
+      lh <- lh - jterm + pterm ## subtract the jacobian, because negative llh
+      lh <- lh + prior_hp ## prior on prior paraemters
 
     }
-    
+
     if(verbose) {
-        ## grab standardized residuals
-        ustd <- vout$var$u
-        ulevel <- vout$var$uraw ## this is always null in the rfvar3 output with non-null sigpar
+      ## grab standardized residuals
+      ustd <- vout$var$u
+      ulevel <- vout$var$uraw ## this is always null in the rfvar3 output with non-null sigpar
 
-        return(list(lh=lh, vout=vout, A=A, lambda = lmd, llmd = -log(lmd), u=ulevel,
-                    ustd=ustd, asig = pparams$asig, x = x, lplmd = lplmd, allh = allh)) ##llmd included because exp(-lmd) might lose precision.
-        
+      return(list(lh=lh, vout=vout, A=A, lambda = lmd, llmd = -log(lmd), u=ulevel,
+                  ustd=ustd, asig = pparams$asig, x = x, lplmd = lplmd, allh = allh)) ##llmd included because exp(-lmd) might lose precision.
+
     } else {
-        return(lh)
+      return(lh)
     }
-    
-}
+
+  }
 
 
 
 
-dataprep = function(dfData, vars, logseries = c(1,1,1,1,0,0,0,0),
+dataprep <-
+  function(
+    dfData,
+    vars,
+    logseries = c(1,1,1,1,0,0,0,0),
     differences = rep(0,8),
-    startdate = NULL, enddate = NULL, timedummy = NULL,
-    frequency = 'monthly', Tsigbrk = NULL){
+    startdate = NULL, enddate = NULL,
+    timedummy = NULL,
+    frequency = 'monthly',
+    Tsigbrk = NULL
+  ){
 
     ## A simple function to prepare the data
     ## Takes logarithms and trims the data to desired start and end points (with string inputs)
     ## Also converts string inputs of break points into the correct numerical indices
 
-    ## Karthik Sastry
-    ## R 3.0.2, 64 Bit
-    ## June 2014
-
-
     ## END Preamble
 
-########################################
 
 
 
-    ##
-    ## Extracting relevant variables
-    ##
+    ## Extracting relevant variables ----
 
-    Y = dfData[,vars]
+    Y <- dfData[,vars]
 
-    ##
-    ## Finding start point
-    ##
+    ## Finding start point ----
+
 
     if (!is.null(startdate)) {
-	startdate = which(dfData[,1] == startdate)
-	##need this to be 1d object else error
-    } else { ##find first Year in which all data are available
-	missingData = is.na(Y)
-	anyMissing = apply(missingData,1,any)
-	allPresent = which(anyMissing == FALSE, arr.ind = TRUE)
-	startdate = allPresent[1]
+      startdate <- which(dfData[,1] == startdate)
+      ##need this to be 1d object else error
+    } else {
+      ##find first Year in which all data are available
+      missingData <- is.na(Y)
+      anyMissing <- apply(missingData,1,any)
+      allPresent <- which(anyMissing == FALSE, arr.ind = TRUE)
+      startdate <- allPresent[1]
     }
 
-    ##
-    ## Finding end point
-    ##
+    ## Finding end point ----
+
 
     if (!is.null(enddate)) {
-	enddate = which(dfData[,1] == enddate)
+      enddate <- which(dfData[,1] == enddate)
     } else {
-	enddate = dim(Y)[1] ##end at last observation
+      enddate <- dim(Y)[1] ##end at last observation
     }
 
-    ##
-    ## Applying start and end points
-    ##
+    ## Applying start and end points ----
 
-    Y = Y[startdate:enddate,]
-    dates = dfData[startdate:enddate,1]
+    Y <- Y[startdate:enddate,]
+    dates <- dfData[startdate:enddate,1]
 
-    Y = data.matrix(Y) ##data frame class -> matrix class
+    Y <- data.matrix(Y) ##data frame class -> matrix class
 
-    ##
-    ## Applying logarithms and differences
-    ##
+
+    ## Applying logarithms and differences ----
 
     if (sum(logseries) > 0) {
-	lcLogSeries = (logseries == 1) ##lc = logical; prefer 0/1 input so conversion necessary
-	Y[,lcLogSeries] = log(Y[,lcLogSeries])
+      ##lc <- logical; prefer 0/1 input so conversion necessary
+      lcLogSeries <- (logseries == 1)
+      Y[,lcLogSeries] <- log(Y[,lcLogSeries])
     }
 
     if (sum(differences) > 0) {
-	tempY = Y
-	for (iColumn in 1:length(differences)) { ##columnwise Kronecker produdct
-            tempY[,iColumn] = differences[iColumn] * tempY[,iColumn]
-	}
-	Y = Y[2:dim(Y)[1],] - tempY[1:(dim(Y)[1] - 1),] 
-	##subtracting lag 1 for differenced series, zeros for other series
-	dates = dates[2:length(dates)]
-	##small issue: will waste a row if: d1 series were available at t-1, but d0 series were not, then t will not be used (because it will initially start at t, then start at t+1 after trying to difference)
+      tempY <- Y
+      for (iColumn in 1:length(differences)) {
+        ##columnwise Kronecker produdct:
+        tempY[,iColumn] <- differences[iColumn] * tempY[,iColumn]
+      }
+      Y <- Y[2:dim(Y)[1],] - tempY[1:(dim(Y)[1] - 1),]
+      ##subtracting lag 1 for differenced series, zeros for other series
+      dates <- dates[2:length(dates)]
+      ##small issue: will waste a row if: d1 series were available at t-1, but d0 series were not, then t will not be used (because it will initially start at t, then start at t+1 after trying to difference)
     }
 
-    ##
-    ## Adding date dummies
-    ##
+    ## Adding date dummies ----
+
+
     if (!is.null(timedummy)){
-	nDummies = length(timedummy)
-	dummyMatrix = matrix(0,length(dates),nDummies)
-	for (iDummy in (1:nDummies)) {
-            if (grepl(':',timedummy[iDummy])){
-                ##dummy for time range
-                endpoints = strsplit(timedummy[iDummy],':')
-                startPoint = which(dates == endpoints[1], ind = TRUE)
-                endPoint = which(dates == endpoints[2], ind = TRUE)
-                dummyMatrix[startPoint:endPoint, iDummy] = 1
-            } else {
-                ##dummy for single period
-                dummyMatrix[dates == endpoints, iDummy] = 1
-            }
-	}
-	colnames(dummyMatrix) = timedummy
-	X = ts(dummyMatrix)
+      nDummies <- length(timedummy)
+      dummyMatrix <- matrix(0,length(dates),nDummies)
+      for (iDummy in (1:nDummies)) {
+        if (grepl(':',timedummy[iDummy])){
+          ##dummy for time range
+          endpoints <- strsplit(timedummy[iDummy],':')
+          startPoint <- which(dates == endpoints[1], ind = TRUE)
+          endPoint <- which(dates == endpoints[2], ind = TRUE)
+          dummyMatrix[startPoint:endPoint, iDummy] <- 1
+        } else {
+          ##dummy for single period
+          dummyMatrix[dates == endpoints, iDummy] <- 1
+        }
+      }
+      colnames(dummyMatrix) <- timedummy
+      X <- ts(dummyMatrix)
     } else {
-	X = NULL
+      X <- NULL
     }
 
-    ##
-    ## Determining date from string
-    ##
+    ## Determining date from string ----
+
     if (!is.null(Tsigbrk)) {
-	nBreaks = length(Tsigbrk)
-	breakInd = rep(NA,nBreaks)
-	for (iBreak in (1:nBreaks)){
-            breakInd[iBreak] = which(dates == Tsigbrk[iBreak], arr.ind = TRUE)
-	}
+      nBreaks <- length(Tsigbrk)
+      breakInd <- rep(NA,nBreaks)
+      for (iBreak in (1:nBreaks)){
+        breakInd[iBreak] <- which(dates == Tsigbrk[iBreak], arr.ind = TRUE)
+      }
     } else {
-	breakInd = NULL
+      breakInd <- NULL
     }
 
     ## Will be implemented later
 
-    ##
-    ## Converting string break dates to integer indices
-    ##
+
+    ## Converting string break dates to integer indices ----
 
 
-    ##
-    ## Creating time series object
-    ##
+    ## Creating time series object ----
 
-    Y = ts(Y)
+    Y <- ts(Y)
 
-    output = list(Y = Y, X = X, Tsigbrk = breakInd)
+    output <-
+      list(Y = Y, X = X, Tsigbrk = breakInd)
+
     return(output)
-}
+  }
 
 
-drawdelta = function(uout, alpha = .01, k = 4){
+drawdelta <-
+  function(uout, alpha = .01, k = 4){
 
     ## draws from mixture of normals
     ## alpha is the probability OF an outlier
@@ -852,68 +829,68 @@ drawdelta = function(uout, alpha = .01, k = 4){
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
 
-    
-    u = c(uout) ## treat everything symmetrically
+
+    u <- c(uout) ## treat everything symmetrically
 
     if (length(k) == 1){
-        nprob = dnorm(u) ## if standard
-        oprob = dnorm(u/k) ## if outlier
+      nprob <- dnorm(u) ## if standard
+      oprob <- dnorm(u/k) ## if outlier
 
-        post = (alpha * oprob) / (alpha * oprob + k * (1-alpha) * nprob) ## posterior proability
+      post <- (alpha * oprob) / (alpha * oprob + k * (1-alpha) * nprob) ## posterior proability
 
-        delta = log(k) * (runif(length(u)) < post) ## take delta with this probability
+      delta <- log(k) * (runif(length(u)) < post) ## take delta with this probability
     } else { ## n generalization
 
-        scalemat = array(rep(k, times = rep(length(u),length(k))),
-                         dim = c(dim(uout),length(k)))
-        alphamat = array(rep(alpha, times = rep(length(u),length(k))),
-                         dim = c(dim(uout),length(alpha)))
+      scalemat <- array(rep(k, times = rep(length(u),length(k))),
+                        dim = c(dim(uout),length(k)))
+      alphamat <- array(rep(alpha, times = rep(length(u),length(k))),
+                        dim = c(dim(uout),length(alpha)))
 
-        ubig = array(uout, dim = c(dim(uout),length(k)))
+      ubig <- array(uout, dim = c(dim(uout),length(k)))
 
-        ratio = alphamat * dnorm(ubig / scalemat) / scalemat
+      ratio <- alphamat * dnorm(ubig / scalemat) / scalemat
 
-        prob = ratio / c(apply(ratio,c(1,2),sum)) ## normalized to probability
-        cprob = aperm(apply(prob,c(1,2),cumsum),c(2,3,1))
+      prob <- ratio / c(apply(ratio,c(1,2),sum)) ## normalized to probability
+      cprob <- aperm(apply(prob,c(1,2),cumsum),c(2,3,1))
 
-        
-        ## assume alpha are ordered small to large
-        delta = matrix(0,dim(uout)[1],dim(uout)[2])
-        dk = c(log(k[1]),diff(log(k)))
-        rnum = matrix(runif(length(u)),dim(uout)[1],dim(uout)[2])
 
-        delta  = delta + log(scalemat[,,1]) * (rnum < cprob[,,1])
+      ## assume alpha are ordered small to large
+      delta <- matrix(0,dim(uout)[1],dim(uout)[2])
+      dk <- c(log(k[1]),diff(log(k)))
+      rnum <- matrix(runif(length(u)),dim(uout)[1],dim(uout)[2])
 
-        ## dkmat = array(rep(dk, times = rep(length(u),length(k))),
-        ##                  dim = c(dim(uout),length(k)))
+      delta  <- delta + log(scalemat[,,1]) * (rnum < cprob[,,1])
 
-        for (iv in 2:length(k)){
-            delta = delta + log(scalemat[,,iv]) * (rnum > cprob[,,iv-1]) *
-                (rnum < cprob[,,iv])
-        }
-            
-        
-        ## for (iv in 1:length(k)){
-        ##     delta = delta + dk[iv] * (rnum < prob[,,iv])
-        ## }
+      ## dkmat <- array(rep(dk, times = rep(length(u),length(k))),
+      ##                  dim = c(dim(uout),length(k)))
 
-        ## dkmat = array(rep(dk, times = rep(length(u),length(k))),
-        ##                  dim = c(dim(uout),length(k)))
+      for (iv in 2:length(k)){
+        delta <- delta + log(scalemat[,,iv]) * (rnum > cprob[,,iv-1]) *
+          (rnum < cprob[,,iv])
+      }
 
-                    
+
+      ## for (iv in 1:length(k)){
+      ##     delta <- delta + dk[iv] * (rnum < prob[,,iv])
+      ## }
+
+      ## dkmat <- array(rep(dk, times = rep(length(u),length(k))),
+      ##                  dim = c(dim(uout),length(k)))
+
+
     }
 
     return(matrix(delta,dim(uout)[1],dim(uout)[2]))
-}
-    
-    
-    
+  }
 
 
-drawt = function(uout, alpha = 4, beta = alpha){
+
+
+
+drawt <-
+  function(uout, alpha = 4, beta = alpha){
 
     ## draws igamma weights, for model with T errors
     ## beta is a rate, not a scale
@@ -923,163 +900,164 @@ drawt = function(uout, alpha = 4, beta = alpha){
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
-    
-    u = c(uout) ## treat everything symmetrically
 
-    ## delta = rgamma(rep(alpha + 1/2,length(u)), 1/(1/beta + .5 * u^2)) ## this gives 1/sigma^2w
+    u <- c(uout) ## treat everything symmetrically
 
-    
-    palpha = rep(alpha + 1/2,length(u))
-    pbeta =  beta + .5 * u^2 
+    ## delta <- rgamma(rep(alpha + 1/2,length(u)), 1/(1/beta + .5 * u^2)) ## this gives 1/sigma^2w
 
-    delta = rgamma(n = length(palpha), shape = palpha, rate = pbeta) ##1/variance units
-    
-    delta = -log(delta)/2 ## log of standard deviation units
+
+    palpha <- rep(alpha + 1/2,length(u))
+    pbeta <-  beta + .5 * u^2
+
+    delta <- rgamma(n = length(palpha), shape = palpha, rate = pbeta) ##1/variance units
+
+    delta <- -log(delta)/2 ## log of standard deviation units
     return(matrix(delta,dim(uout)[1],dim(uout)[2]))
-}
-    
-    
-    
+  }
 
 
-fd = function(delta,tparam,tscale = 1){ ## igamma tparam/2, 2/tparam
+
+
+
+fd <-
+  function(delta,tparam,tscale = 1){ ## igamma tparam/2, 2/tparam
 
     ## returns inverse gamma density evaluated at values of matrix delta
-    
-    alpha = tparam/2
-    beta = tparam/2 * tscale^2 ## scale, not rate
-    
-    cterm = alpha * log(beta) - lgamma(alpha)
-    xterm = -(alpha + 1) * (2 * delta) - beta / exp(2 *  delta)
+
+    alpha <- tparam/2
+    beta <- tparam/2 * tscale^2 ## scale, not rate
+
+    cterm <- alpha * log(beta) - lgamma(alpha)
+    xterm <- -(alpha + 1) * (2 * delta) - beta / exp(2 *  delta)
 
     return(sum(xterm + cterm))
-}
+  }
 
 
 
-gdraw_1v =  function(ydata, xdata, olsfun, ndraw,
-    x0,
-    nburn = 1e3, nsep = 1e2,
-    filename = 'gdraw_1v.Rdata',
-    sigfactor = 0.2,
-    tparam = NULL,
-    tscale = 1,
-    savespots = NULL,
-    dscore = FALSE,
-    drawdout = FALSE){
+gdraw_1v <-
+  function(ydata, xdata, olsfun, ndraw,
+           x0,
+           nburn = 1e3, nsep = 1e2,
+           filename = 'gdraw_1v.Rdata',
+           sigfactor = 0.2,
+           tparam = NULL,
+           tscale = 1,
+           savespots = NULL,
+           dscore = FALSE,
+           drawdout = FALSE){
 
     ## Gibbs sampling for normal mixture single equation models
     ## see gdraw.R for more details
-    
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
     ## decide where to save
     if (is.null(savespots)){
-        nsaves = 5
-        inc = ndraw %/% nsaves
-        if (inc == 0){
-            savespots = ndraw ## no need to save until end
-        } else {
-            savespots = c(seq(1, ndraw, inc), ndraw)
-        }
+      nsaves <- 5
+      inc <- ndraw %/% nsaves
+      if (inc == 0){
+        savespots <- ndraw ## no need to save until end
+      } else {
+        savespots <- c(seq(1, ndraw, inc), ndraw)
+      }
     }
 
 
     ## allocate space for output
-    xout = matrix(0,length(x0),ndraw)
-    lhout = rep(0,ndraw)
-    tout = rep(0,ndraw)
+    xout <- matrix(0,length(x0),ndraw)
+    lhout <- rep(0,ndraw)
+    tout <- rep(0,ndraw)
 
     if (drawdout){
-        dout = matrix(0,length(ydata),ndraw)
+      dout <- matrix(0,length(ydata),ndraw)
     }  else {
-        dout = matrix(0,length(ydata),length(savespots))
+      dout <- matrix(0,length(ydata),length(savespots))
     }
 
-    isave = 1 ## first save
+    isave <- 1 ## first save
 
     if (dscore){
-        dsout = rep(0,ndraw)
+      dsout <- rep(0,ndraw)
     } else {
-        dsout = NULL
+      dsout <- NULL
     }
-    
-    output = NULL
 
-    gout = list(xout = x0, deltaout = dout[,,1])
-    
+    output <- NULL
+
+    gout <- list(xout = x0, deltaout = dout[,,1])
+
 
     ## Run the Gibbs Sampler
     if (nburn > 0){
-        for (iburn in 1:nburn){
-            gout = gstep_1v(gout, olsfun, ydata, xdata,
-                tparam, tscale, dscore)
-        }
+      for (iburn in 1:nburn){
+        gout <- gstep_1v(gout, olsfun, ydata, xdata,
+                         tparam, tscale, dscore)
+      }
     }
     for (idraw in 1:ndraw){
-        for (isep in 1:nsep){
-            gout = gstep_1v(gout, olsfun, ydata, xdata,
-                tparam, tscale, dscore)
-        }
+      for (isep in 1:nsep){
+        gout <- gstep_1v(gout, olsfun, ydata, xdata,
+                         tparam, tscale, dscore)
+      }
 
-        ## update
-        xout[,idraw] = gout$xout
-        lhout[idraw] = gout$lhout
-        tout[idraw]  = gout$trans
-        if(drawdout) {
-            dout[,idraw] = gout$deltaout
-        }
+      ## update
+      xout[,idraw] <- gout$xout
+      lhout[idraw] <- gout$lhout
+      tout[idraw]  <- gout$trans
+      if(drawdout) {
+        dout[,idraw] <- gout$deltaout
+      }
 
-        if (dscore){
-            dsout[idraw] = gout$dsout
-        }
-        
-        if (idraw %in% savespots){
-            dout[,,isave] = gout$deltaout
-            isave = isave + 1
-            output = list(xout = xout, lhout = lhout,
-                          tout = tout, dout = dout,
-                          dsout = dsout)
-            save(output, file = filename)
-        }
+      if (dscore){
+        dsout[idraw] <- gout$dsout
+      }
+
+      if (idraw %in% savespots){
+        dout[,,isave] <- gout$deltaout
+        isave <- isave + 1
+        output <- list(xout = xout, lhout = lhout,
+                       tout = tout, dout = dout,
+                       dsout = dsout)
+        save(output, file = filename)
+      }
 
     }
 
 
     if (is.null(output)){
-        output = list(xout = xout, lhout = lhout,
-                      tout = tout, dout = dout,
-                      dsout = dsout)
+      output <- list(xout = xout, lhout = lhout,
+                     tout = tout, dout = dout,
+                     dsout = dsout)
     }
 
     save(output, file = filename)
     return(output)
-}
+  }
 
 
 
-gdraw =  function(tvvModel, ndraw, lhfcn = bvarwrap5,
-    nburn = 1e3, nsep = 1e2,
-    filename = 'gibbsout.Rdata',
-    hsnfactor = 0.2,
-    alpha = .003, k = 4,
-    tparam = NULL,
-    tscale = 1,
-    savespots = NULL,
-    dscore = FALSE,
-    drawdout = FALSE, ## if TRUE, keep the delta_it (the xi_it)
-    drawe = FALSE, ## if TRUE, keep the e_it
-    drawa = TRUE,  ## if TRUE, keep the A+ draws
-    hparam_nl = rep(0,5),        # indicates if any hyperparams for nonlinear transformation are used
-    nlt = rep(0,5)               # constant parameters for nlt
-                  ){
+gdraw <-
+  function(tvvModel, ndraw, lhfcn = bvarwrap5,
+           nburn = 1e3, nsep = 1e2,
+           filename = 'gibbsout.Rdata',
+           hsnfactor = 0.2,
+           alpha = .003, k = 4,
+           tparam = NULL,
+           tscale = 1,
+           savespots = NULL,
+           dscore = FALSE,
+           drawdout = FALSE, ## if TRUE, keep the delta_it (the xi_it)
+           drawe = FALSE, ## if TRUE, keep the e_it
+           drawa = TRUE,  ## if TRUE, keep the A+ draws
+           hparam_nl = rep(0,5),        # indicates if any hyperparams for nonlinear transformation are used
+           nlt = rep(0,5)               # constant parameters for nlt
+  ){
 
     ## Main wrapper function for Gibbs Sampling from posterior of normal mixture models
     ## Note that this can also be used to sample from the Normal errors model
@@ -1122,384 +1100,385 @@ gdraw =  function(tvvModel, ndraw, lhfcn = bvarwrap5,
     ## aout : A+ draws
     ## eout : structural residual draws
 
-    
-    
+
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
 
-    hsn = tvvModel$opt$H 
-    x0 = tvvModel$x
+    hsn <- tvvModel$opt$H
+    x0 <- tvvModel$x
 
-    lcA0 = tvvModel$lcA0
-    lcLmd = tvvModel$lcLmd
-    ## ndraw = nsep* ndraw + nburn
-    nvar = dim(lcA0)[1]
+    lcA0 <- tvvModel$lcA0
+    lcLmd <- tvvModel$lcLmd
+    ## ndraw <- nsep* ndraw + nburn
+    nvar <- dim(lcA0)[1]
 
-    lcA0 = tvvModel$lcA0
-    lcLmd = tvvModel$lcLmd
+    lcA0 <- tvvModel$lcA0
+    lcLmd <- tvvModel$lcLmd
 
-    Tsigbrk = tvvModel$Tsigbrk
-    pparams = tvvModel$pparams
-    listData = tvvModel$listData
-    lmdblock = tvvModel$lmdblock
-    nLags = tvvModel$nLags
+    Tsigbrk <- tvvModel$Tsigbrk
+    pparams <- tvvModel$pparams
+    listData <- tvvModel$listData
+    lmdblock <- tvvModel$lmdblock
+    nLags <- tvvModel$nLags
 
 
-    Sigma = hsnfactor * hsn
+    Sigma <- hsnfactor * hsn
 
     ## decide where to save
     if (is.null(savespots)){
-        nsaves = 5
-        inc = ndraw %/% nsaves
-        if (inc == 0){
-            savespots = ndraw ## no need to save until end
-        } else {
-            savespots = c(seq(1, ndraw, inc), ndraw)
-        }
+      nsaves <- 5
+      inc <- ndraw %/% nsaves
+      if (inc == 0){
+        savespots <- ndraw ## no need to save until end
+      } else {
+        savespots <- c(seq(1, ndraw, inc), ndraw)
+      }
     }
 
 
     ## allocate space for output
-    xout = matrix(0,length(x0),ndraw)
-    lhout = rep(0,ndraw)
-    tout = rep(0,ndraw)
+    xout <- matrix(0,length(x0),ndraw)
+    lhout <- rep(0,ndraw)
+    tout <- rep(0,ndraw)
 
     ## always save delta, a, e in savespots
     if (drawdout){ ## delta_it
-        dout = array(0,
-                     c(dim(listData$Y)[1] - nLags,
-                       dim(listData$Y)[2],
-                       ndraw))
+      dout <- array(0,
+                    c(dim(listData$Y)[1] - nLags,
+                      dim(listData$Y)[2],
+                      ndraw))
     }  else {
-        dout = array(0,
-                     c(dim(listData$Y)[1] - nLags,
-                       dim(listData$Y)[2],
-                       length(savespots)))
-    }
-    
-    if (drawa){ ## A+
-        aout = array(0,
-                     c(nLags * nvar + 1,
-                       nvar,
-                       ndraw))
-    }  else {
-        aout = array(0,
-                     c(nLags * nvar + 1,
-                       nvar,
-                       ndraw))
-    }
-    
-    if (drawe){ ## epsilon_it
-        eout = array(0,
-                     c(dim(listData$Y)[1] - nLags,
-                       dim(listData$Y)[2],
-                       ndraw))
-    }  else {
-        eout = array(0,
-                     c(dim(listData$Y)[1] - nLags,
-                       dim(listData$Y)[2],
-                       length(savespots)))
+      dout <- array(0,
+                    c(dim(listData$Y)[1] - nLags,
+                      dim(listData$Y)[2],
+                      length(savespots)))
     }
 
-    isave = 1 ## first save
+    if (drawa){ ## A+
+      aout <- array(0,
+                    c(nLags * nvar + 1,
+                      nvar,
+                      ndraw))
+    }  else {
+      aout <- array(0,
+                    c(nLags * nvar + 1,
+                      nvar,
+                      ndraw))
+    }
+
+    if (drawe){ ## epsilon_it
+      eout <- array(0,
+                    c(dim(listData$Y)[1] - nLags,
+                      dim(listData$Y)[2],
+                      ndraw))
+    }  else {
+      eout <- array(0,
+                    c(dim(listData$Y)[1] - nLags,
+                      dim(listData$Y)[2],
+                      length(savespots)))
+    }
+
+    isave <- 1 ## first save
 
     if (dscore){
-        dsout = rep(0,ndraw)
+      dsout <- rep(0,ndraw)
     } else {
-        dsout = NULL
+      dsout <- NULL
     }
-    
-    output = NULL
+
+    output <- NULL
 
     if (!is.null(tvvModel$dout)){
-        dout[,,1] = tvvModel$dout
+      dout[,,1] <- tvvModel$dout
     }
-    
 
-    gout = list(xout = x0, deltaout = dout[,,1])
-    
+
+    gout <- list(xout = x0, deltaout = dout[,,1])
+
 
     ## Run the Gibbs Sampler
     if (nburn > 0){
-        for (iburn in 1:nburn){
-            gout = gstep(gout, lhfcn, Sigma, lcA0, lcLmd, alpha, k,
-                         lmdblock = lmdblock, Tsigbrk = Tsigbrk,
-                         pparams = pparams, listData = listData, nLags = nLags,
-                         tparam = tparam, tscale = tscale, drawbe = TRUE,
-                         hparam_nl = hparam_nl, nlt = nlt)
-        }
+      for (iburn in 1:nburn){
+        gout <- gstep(gout, lhfcn, Sigma, lcA0, lcLmd, alpha, k,
+                      lmdblock = lmdblock, Tsigbrk = Tsigbrk,
+                      pparams = pparams, listData = listData, nLags = nLags,
+                      tparam = tparam, tscale = tscale, drawbe = TRUE,
+                      hparam_nl = hparam_nl, nlt = nlt)
+      }
     }
     for (idraw in 1:ndraw){
-        for (isep in 1:nsep){
-            gout = gstep(gout, lhfcn, Sigma, lcA0, lcLmd, alpha, k,
-                         lmdblock = lmdblock, Tsigbrk = Tsigbrk,
-                         pparams = pparams, listData = listData, nLags = nLags,
-                         tparam = tparam, dscore = dscore, tscale = tscale, drawbe =TRUE,
-                         hparam_nl = hparam_nl, nlt = nlt)
-        }
+      for (isep in 1:nsep){
+        gout <- gstep(gout, lhfcn, Sigma, lcA0, lcLmd, alpha, k,
+                      lmdblock = lmdblock, Tsigbrk = Tsigbrk,
+                      pparams = pparams, listData = listData, nLags = nLags,
+                      tparam = tparam, dscore = dscore, tscale = tscale, drawbe =TRUE,
+                      hparam_nl = hparam_nl, nlt = nlt)
+      }
 
-        ## update
-        xout[,idraw] = gout$xout
-        lhout[idraw] = gout$lhout
-        tout[idraw]  = gout$trans
-        if(drawdout) {
-            dout[,,idraw] = gout$deltaout
-        }
+      ## update
+      xout[,idraw] <- gout$xout
+      lhout[idraw] <- gout$lhout
+      tout[idraw]  <- gout$trans
+      if(drawdout) {
+        dout[,,idraw] <- gout$deltaout
+      }
 
-        if(drawa) {
-            aout[,,idraw] = gout$aout
-        }
+      if(drawa) {
+        aout[,,idraw] <- gout$aout
+      }
 
-        if(drawe) {
-            eout[,,idraw] = gout$eout
-        }
+      if(drawe) {
+        eout[,,idraw] <- gout$eout
+      }
 
-        if (dscore){
-            dsout[idraw] = gout$dsout
-        }
-        if(idraw %% 100 ==1) print(paste(filename, "draw number", idraw))
-        if (idraw %in% savespots){
-            dout[,,isave] = gout$deltaout
-            isave = isave + 1
-            output = list(xout = xout, lhout = lhout,
-                          tout = tout, dout = dout,
-                          dsout = dsout, aout = aout, eout = eout)
-            outcon <- file(filename, open="wb")
-            save(output, file = outcon)
-            flush(outcon)
-            close(outcon)
-        }
+      if (dscore){
+        dsout[idraw] <- gout$dsout
+      }
+      if(idraw %% 100 ==1) print(paste(filename, "draw number", idraw))
+      if (idraw %in% savespots){
+        dout[,,isave] <- gout$deltaout
+        isave <- isave + 1
+        output <- list(xout = xout, lhout = lhout,
+                       tout = tout, dout = dout,
+                       dsout = dsout, aout = aout, eout = eout)
+        outcon <- file(filename, open="wb")
+        save(output, file = outcon)
+        flush(outcon)
+        close(outcon)
+      }
 
     }
 
     if (is.null(output)){
-        output = list(xout = xout, lhout = lhout,
-                      tout = tout, dout = dout,
-                      dsout = dsout, aout = aout, eout = eout)
+      output <- list(xout = xout, lhout = lhout,
+                     tout = tout, dout = dout,
+                     dsout = dsout, aout = aout, eout = eout)
     }
     outcon <- file(filename, open="wb")
     save(output, file = outcon)
     flush(outcon)
     close(outcon)
     return(output)
-}
+  }
 
 
 
-get_forecast = function(tout,
-    nperiods = 8,
-    T = dim(ydata)[1]){
+get_forecast <-
+  function(tout,
+           nperiods = 8,
+           T = dim(ydata)[1]){
 
     ## gets a forecast nperiods into the future
     ## starts at cap T
 
     ## input to this function is full output of optimization
 
-########################################
-    
-    ydata = as.matrix(tout$listData$Y)
+
+    ydata <- as.matrix(tout$listData$Y)
 
     ## get the reduced form coefficients
-    A = tout$A
+    A <- tout$A
 
 
-    Ai = solve(A)
+    Ai <- solve(A)
 
-    vout = tout$vout
+    vout <- tout$vout
 
-    By = vout$var$By
-    nv = dim(By)[1]
-    nlags = dim(By)[3]
+    By <- vout$var$By
+    nv <- dim(By)[1]
+    nlags <- dim(By)[3]
 
-    Bx = Ai %*% matrix(vout$var$Bx,nv,1)
+    Bx <- Ai %*% matrix(vout$var$Bx,nv,1)
 
     for (ilag in 1:nlags){
-        By[,,ilag] = Ai %*% By[,,ilag]
+      By[,,ilag] <- Ai %*% By[,,ilag]
     }
 
     ## get the system matrix
-    sys = sysmat(By = By, Bx = Bx)
+    sys <- sysmat(By = By, Bx = Bx)
     ## get the data vector
 
-    ## T = dim(ydata)[1]
-    y = matrix(0,nv,nlags)
+    ## T <- dim(ydata)[1]
+    y <- matrix(0,nv,nlags)
 
     for (ilag in 1:nlags){
-        y[,ilag] = ydata[T - ilag + 1,]
+      y[,ilag] <- ydata[T - ilag + 1,]
     }
 
-    y = c(y,1) # constant at the end
+    y <- c(y,1) # constant at the end
 
     ## calculate the predictions
-    pmat = matrix(0,nperiods,nv)
+    pmat <- matrix(0,nperiods,nv)
 
     for (iperiod in 1:nperiods){
-        y = sys %*% y
-        pmat[iperiod,] = y[1:nv]
+      y <- sys %*% y
+      pmat[iperiod,] <- y[1:nv]
     }
 
     return(pmat)
-}
+  }
 
 
-get_mdd = function(x, lh, trunc = .95, delta = NULL,
-    alpha =3, beta = 3, efac = NULL,
-    covsub = FALSE){
+get_mdd <-
+  function(x, lh, trunc = .95, delta = NULL,
+           alpha =3, beta = 3, efac = NULL,
+           covsub = FALSE){
 
 
     ## Small wrapper function for calculated mdd with MHM methods
     ## automatically puts gaussian distribution on x truncated for trunc density
     ## can put extra density in efac (e.g., on the delta_it)
-    
+
     ## x is the draws in a matrix
     ## lh is a vector of -log posterior densities (conditional on certain params)
     ## efac is extra piece numerator density for MHM
     ## covsub determines whether to calc covariance matrix with all xout, or 5000 evenly spaced draws
     ## of it (mainly to save time)
-    
+
     ## trunc is the truncation of the Gaussian (what percentage is kept) for A0 and Lambda
     ## delta is the delta_it in an array, if appropriate
     ## alpha and beta are for the distribution of the delta (maybe you should change this)
 
     ## END PREAMBLE
-######################################################################################
 
-    
 
-    
+
+
     ## gets estimates of the MDD for the model
 
     ## first, get a Gaussian approx
-    xmean = apply(x,2,mean)
-    T = dim(x)[1]
-    nv = dim(x)[2]
-    ## covmat = crossprod(x) / T
+    xmean <- apply(x,2,mean)
+    T <- dim(x)[1]
+    nv <- dim(x)[2]
+    ## covmat <- crossprod(x) / T
 
     if (covsub){
-        ## use subsample for the covariance matrix
-        xsub = seq(from=1,to=T,length.out = 5000)
-        covmat = cov(x[xsub,])
+      ## use subsample for the covariance matrix
+      xsub <- seq(from=1,to=T,length.out = 5000)
+      covmat <- cov(x[xsub,])
     } else {
-        covmat = cov(x)
+      covmat <- cov(x)
     }
 
     ## If covariance matrix is near singular, add noise
     if (min(eigen(covmat)$values) < 1e-8){
-        covmat = covmat + 1e-3 * diag(dim(covmat)[1])
+      covmat <- covmat + 1e-3 * diag(dim(covmat)[1])
     }
-    
+
 
     ## get det
-    cdet = sum(log(eigen(covmat)$values))
-    
-    ## ## evaluate gaussian approx
-    ci = (chol(solve(covmat)))
-    xdm = t(x) - xmean
-    cixdm = ci %*% xdm
-    qscore = apply(cixdm^2,2,sum) ## quadratic part
-    
-    ## qscore = diag(t(xdm) %*% solve(covmat) %*% (xdm))
+    cdet <- sum(log(eigen(covmat)$values))
 
-    ## qscore = rep(0,dim(xdm)[1])
+    ## ## evaluate gaussian approx
+    ci <- (chol(solve(covmat)))
+    xdm <- t(x) - xmean
+    cixdm <- ci %*% xdm
+    qscore <- apply(cixdm^2,2,sum) ## quadratic part
+
+    ## qscore <- diag(t(xdm) %*% solve(covmat) %*% (xdm))
+
+    ## qscore <- rep(0,dim(xdm)[1])
     ## for (i in 1:dim(xdm)[1]){
-    ##     qscore[i] = (xdm[i,]) %*% covmat %*% t(xdm[1,])
+    ##     qscore[i] <- (xdm[i,]) %*% covmat %*% t(xdm[1,])
     ## }
 
 
-    dout = -.5 * qscore - .5 * (nv * log(2 *pi) + cdet) ## density
+    dout <- -.5 * qscore - .5 * (nv * log(2 *pi) + cdet) ## density
 
-    kval = qscore < qchisq(trunc,nv) ## truncate the tails of the gaussian
+    kval <- qscore < qchisq(trunc,nv) ## truncate the tails of the gaussian
 
     if (!is.null(delta)){ ## put some distributio on the delta
-        
-        ## The conditional posterior is inverse gamma for the t case,
-        ## and a known multinomial for the normal mix case
-        ## so we should probably just use those distributions independent for each
-        ## not what's implemented here
 
-        
-        dmat = matrix(delta, dim(delta)[1] * dim(delta)[2], dim(delta)[3])
+      ## The conditional posterior is inverse gamma for the t case,
+      ## and a known multinomial for the normal mix case
+      ## so we should probably just use those distributions independent for each
+      ## not what's implemented here
 
-        ## ## trial 1: ivnerse gamma
-        ## alpha = 3
-        ## beta = 3 ## inverse gamma parameters
-        ## dweight = -(alpha-1) * (2 * dmat) - beta / exp(2 * dmat)
-        ## dweight = dweight + alpha * log(beta) - lgamma(alpha)
 
-        ## ## trial 2: regular gamma
-        dweight = log(dgamma(exp(2 * dmat), shape = alpha, rate = 1/alpha))
-        dweight = apply(dweight,2,sum)
-        dout = dout + dweight
+      dmat <- matrix(delta, dim(delta)[1] * dim(delta)[2], dim(delta)[3])
+
+      ## ## trial 1: ivnerse gamma
+      ## alpha <- 3
+      ## beta <- 3 ## inverse gamma parameters
+      ## dweight <- -(alpha-1) * (2 * dmat) - beta / exp(2 * dmat)
+      ## dweight <- dweight + alpha * log(beta) - lgamma(alpha)
+
+      ## ## trial 2: regular gamma
+      dweight <- log(dgamma(exp(2 * dmat), shape = alpha, rate = 1/alpha))
+      dweight <- apply(dweight,2,sum)
+      dout <- dout + dweight
     }
 
-    gdout = dout + lh - log(trunc) ## before truncation
+    gdout <- dout + lh - log(trunc) ## before truncation
 
-    gdmean = mean(gdout)
+    gdmean <- mean(gdout)
 
-    gdfix = gdout
-    gdfix[!kval] = -1e10 ## zero values
+    gdfix <- gdout
+    gdfix[!kval] <- -1e10 ## zero values
 
     ##return(-(gdmean + log(mean(exp(gdfix-gdmean)))))
     if (is.null(efac)){
-        return(-(gdmean + log(mean(exp(gdfix-gdmean)))))
+      return(-(gdmean + log(mean(exp(gdfix-gdmean)))))
     } else {
-        m1 = -(gdmean + log(mean(exp(gdfix-gdmean))))
+      m1 <- -(gdmean + log(mean(exp(gdfix-gdmean))))
 
-        ## with the additonal correction
-        gdout = dout + efac + lh - log(trunc)
-        
+      ## with the additonal correction
+      gdout <- dout + efac + lh - log(trunc)
 
-        gdmean = mean(gdout)
-        gdfix = gdout
-        gdfix[!kval] = -1e10 ## zero values
-        m2 = -(gdmean + log(mean(exp(gdfix-gdmean))))
 
-        outlist = list(mout = c(m1,m2), cv = covmat)
-        return(outlist)
+      gdmean <- mean(gdout)
+      gdfix <- gdout
+      gdfix[!kval] <- -1e10 ## zero values
+      m2 <- -(gdmean + log(mean(exp(gdfix-gdmean))))
+
+      outlist <- list(mout = c(m1,m2), cv = covmat)
+      return(outlist)
     }
-}
+  }
 
 
 
-getrmse = function(fcast,ydata,h = c(1,6,12,24,48)){
+getrmse <-
+  function(fcast,ydata,h = c(1,6,12,24,48)){
 
     ## get root mean squared error
     ## input is "fcast" array
 
-    nv = dim(fcast)[2] ## number of variables
-    nfc = dim(fcast)[3] ## number of forecasts
-    nh = length(h) ## number of horizons to consider
-    T = dim(ydata)[1]
+    nv <- dim(fcast)[2] ## number of variables
+    nfc <- dim(fcast)[3] ## number of forecasts
+    nh <- length(h) ## number of horizons to consider
+    T <- dim(ydata)[1]
 
-    rmse = array(0, c(nh,nv,nfc))
+    rmse <- array(0, c(nh,nv,nfc))
 
     for (it in 1:nfc){
-        if (sum(abs(fcast[,,it])) > 1e-10){ ## make sure fc is not blank
-            for (ih in 1:nh){
-                hzn = h[ih] ## what horizon
-                if ((hzn + it) <= T){ ## make sure there is space
-                    df = fcast[1:hzn,,it] - ydata[it + 1:hzn,]
-                    if (hzn > 1){
-                        rmse[ih,,it] = sqrt(apply(df^2,2,sum) / hzn)
-                    } else {
-                        rmse[ih,,it] = abs(df)
-                    }
-                    
-                }
+      if (sum(abs(fcast[,,it])) > 1e-10){ ## make sure fc is not blank
+        for (ih in 1:nh){
+          hzn <- h[ih] ## what horizon
+          if ((hzn + it) <= T){ ## make sure there is space
+            df <- fcast[1:hzn,,it] - ydata[it + 1:hzn,]
+            if (hzn > 1){
+              rmse[ih,,it] <- sqrt(apply(df^2,2,sum) / hzn)
+            } else {
+              rmse[ih,,it] <- abs(df)
             }
+
+          }
         }
+      }
     }
     return(rmse)
-}
+  }
 
 
-GsnMove = function(lhfcn, x0, lh0, Sigma, modeA, modeLmd, lcA0, lcLmd, 
-    verbose = FALSE, model = NULL, ordercheck = FALSE,...){
+GsnMove <-
+  function(lhfcn, x0, lh0, Sigma, modeA, modeLmd, lcA0, lcLmd,
+           verbose = FALSE, model = NULL, ordercheck = FALSE,...){
 
     ## One iteration of an MCMC run, using a Gaussian transition density
     ## Based off code in Chris Sims SVN directory
@@ -1508,101 +1487,101 @@ GsnMove = function(lhfcn, x0, lh0, Sigma, modeA, modeLmd, lcA0, lcLmd,
     ## to some baseline. We don't use these features in our final analysis in the paper
 
     ## END PREAMBLE
-######################################################################################
 
 
 
-    x1 = x0 + mvrnorm(n = 1, mu = rep(0, length(x0)), Sigma = Sigma)
+    x1 <- x0 + mvrnorm(n = 1, mu = rep(0, length(x0)), Sigma = Sigma)
 
-    newmodel = lhfcn(x1, lcA0 = lcA0, lcLmd = lcLmd, ..., verbose = TRUE)
-    lh1 = newmodel$lh
+    newmodel <- lhfcn(x1, lcA0 = lcA0, lcLmd = lcLmd, ..., verbose = TRUE)
+    lh1 <- newmodel$lh
 
 
 
-    ## trans = ((lh0 - lh1 > log(runif(1))) && !attr(lh1, "bad"))
-    trans = (lh0 - lh1 > log(runif(1)))
+    ## trans <- ((lh0 - lh1 > log(runif(1))) && !attr(lh1, "bad"))
+    trans <- (lh0 - lh1 > log(runif(1)))
 
     ## this logic could be better, but trying to avoid checking for reorderings if transition not accepted
     if (trans) {
-	if (ordercheck) {
-            mxOutput = GetALmd(x1)
-            perm = normAlmd(mxOutput$A, mxOutput$lmd, modeA, modeLmd)
-            x1 = GetX(perm$A, perm$lmd, lcA, lcLmd)
-            
-            reordering = perm$noloop
-	} else {
-            reordering = FALSE
-	}
-	lh0 = lh1
-	x0 = x1
-	model = newmodel
+      if (ordercheck) {
+        mxOutput <- GetALmd(x1)
+        perm <- normAlmd(mxOutput$A, mxOutput$lmd, modeA, modeLmd)
+        x1 <- GetX(perm$A, perm$lmd, lcA, lcLmd)
+
+        reordering <- perm$noloop
+      } else {
+        reordering <- FALSE
+      }
+      lh0 <- lh1
+      x0 <- x1
+      model <- newmodel
     }
 
     if (!verbose){
-	return(list(x = x0, lh = lh0, trans = trans ))
+      return(list(x = x0, lh = lh0, trans = trans ))
     } else {
-	return(list(x = x0, lh = lh0, trans = trans, aplusmode = model$vout$var$By,
-                    xxi = model$vout$var$xxi, u = model$vout$var$u,model=model))
+      return(list(x = x0, lh = lh0, trans = trans, aplusmode = model$vout$var$By,
+                  xxi = model$vout$var$xxi, u = model$vout$var$u,model=model))
     }
 
-}
+  }
 
 
-gstep_1v = function(gout, olsfun, ydata, xdata,
-    tparam, tscale, dscore, lmdparam = NULL,Sigma = NULL){
+gstep_1v <-
+  function(gout, olsfun, ydata, xdata,
+           tparam, tscale, dscore, lmdparam = NULL,Sigma = NULL){
 
     ## Gibbs sampling step for normal mixture single equation models
     ## see gdraw_1.R for more details
-    
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
     if (is.null(lmdparam)){
-        ## OLS step
-        olsout = olsfun(ydata,xdata,gout$deltaout)
+      ## OLS step
+      olsout <- olsfun(ydata,xdata,gout$deltaout)
     } else{ ## mcmc step
-        lh0 = olsfun(gout$xout,ydata,xdata,gout$deltaout,lmdparam)
-        olsout = GsnMove(olsfun,gout$xout,lh0,Sigma,
-            gout$deltaout,verbose = TRUE)
+      lh0 <- olsfun(gout$xout,ydata,xdata,gout$deltaout,lmdparam)
+      olsout <- GsnMove(olsfun,gout$xout,lh0,Sigma,
+                        gout$deltaout,verbose = TRUE)
     }
-    
-    uout = olsout$u * exp(gout$deltaout) ## multiply by last time's deltaout
+
+    uout <- olsout$u * exp(gout$deltaout) ## multiply by last time's deltaout
 
     if (is.null(tparam)){
-        deltaout = drawdelta(u = uout,alpha = alpha, k = k)
+      deltaout <- drawdelta(u = uout,alpha = alpha, k = k)
     } else { ## draw inverse gamma
-        deltaout = drawt(u = uout, alpha = tparam, beta = (tscale^2) * tparam)
+      deltaout <- drawt(u = uout, alpha = tparam, beta = (tscale^2) * tparam)
     }
 
     if (dscore){ ## reduce delta to a f(delta) for mdd calculation
-        dsout = fd(deltaout, tparam, tscale = tscale)
+      dsout <- fd(deltaout, tparam, tscale = tscale)
     } else {
-        dsout = NULL
+      dsout <- NULL
     }
 
     return(list(xout = olsout$x, deltaout = deltaout,
                 tout = tout, lhout = olsout$lh, dsout = dsout))
 
-}
+  }
 
 
-gstep = function(gout, lhfcn, Sigma, lcA0, lcLmd,
-                 alpha, k,
-                 tparam = NULL,
-                 tscale = 1,
-                 dscore = FALSE, ## if TRUE, calculate the IG density of delta_it
-                 ...){
+gstep <-
+  function(gout, lhfcn, Sigma, lcA0, lcLmd,
+           alpha, k,
+           tparam = NULL,
+           tscale = 1,
+           dscore = FALSE, ## if TRUE, calculate the IG density of delta_it
+           ...){
 
     ## The main iterative step of our Gibbs sampler
     ## Note that most model-related parameters are passed in the ellipses! So see
     ## gdraw.R for more info
 
     ## --------------------INPUTS--------------------
-    ## gout : a list which contains 
+    ## gout : a list which contains
     ##        xout, draw of A0 and Lambda
     ##        deltaout, draw of delta_it
     ##        trans, 1 iff metropolis step moved
@@ -1617,120 +1596,121 @@ gstep = function(gout, lhfcn, Sigma, lcA0, lcLmd,
 
     ## --------------------OUTPUT--------------------
     ## see gout input
-    
-    
+
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
 
     ## markov step
-    x = gout$xout
-    
-    model = lhfcn(x,lcA0,lcLmd, oweights = gout$deltaout,...,verbose = TRUE)
-    almdout = GsnMove(lhfcn, x, model$lh, Sigma,
-                      modeA = NULL,
-                      modeLmd = NULL,
-                      lcA0,
-                      lcLmd,
-                      model = model,
-                      oweights = gout$deltaout,
-                      verbose = TRUE, ...)
+    x <- gout$xout
+
+    model <- lhfcn(x,lcA0,lcLmd, oweights = gout$deltaout,...,verbose = TRUE)
+    almdout <- GsnMove(lhfcn, x, model$lh, Sigma,
+                       modeA = NULL,
+                       modeLmd = NULL,
+                       lcA0,
+                       lcLmd,
+                       model = model,
+                       oweights = gout$deltaout,
+                       verbose = TRUE, ...)
 
 
     ## drawing the new variance weightso
     if (almdout$lh > 1e4){ ## bad draw
-        ## this option should never come into play --- it would only happen if both the initial
-        ## AND proposed draws were bad for some reason. It is probably possible if the variance weight
-        ## from the inverse gamma is large enough to give the linear regression numerical problems, in
-        ## which case you will get a singularity in the LH calculation. So this step imposes some kind of
-        ## truncation on the prior for those (not completely clear what).
-        return(gout)
+      ## this option should never come into play --- it would only happen if both the initial
+      ## AND proposed draws were bad for some reason. It is probably possible if the variance weight
+      ## from the inverse gamma is large enough to give the linear regression numerical problems, in
+      ## which case you will get a singularity in the LH calculation. So this step imposes some kind of
+      ## truncation on the prior for those (not completely clear what).
+      return(gout)
     } else {
 
-        ## next line does not account for the fact that we drew A+
-        ## uout = almdout$u[1:dim(gout$deltaout)[1],] * exp(gout$deltaout) ## multiply by last time's deltaout
+      ## next line does not account for the fact that we drew A+
+      ## uout <- almdout$u[1:dim(gout$deltaout)[1],] * exp(gout$deltaout) ## multiply by last time's deltaout
 
-        aout = almdout$model$vout$var$Bdraw ## A+ draws
-        eout = almdout$model$vout$var$udraw[1:dim(gout$deltaout)[1],] * exp(gout$deltaout) ## multiply by last time's deltaout to get "real" structural resids
-        
-        if (is.null(tparam)){
-            deltaout = drawdelta(u = eout,alpha = alpha, k = k)
-        } else { ## draw inverse gamma
-            deltaout = drawt(u = eout, alpha = tparam, beta = (tscale^2) * tparam)
-        }
+      aout <- almdout$model$vout$var$Bdraw ## A+ draws
+      eout <- almdout$model$vout$var$udraw[1:dim(gout$deltaout)[1],] * exp(gout$deltaout) ## multiply by last time's deltaout to get "real" structural resids
 
-        if (dscore){ ## reduce delta to a f(delta) for mdd calculation
-            dsout = fd(deltaout, tparam)
-        } else {
-            dsout = NULL
-        }
-        
-        return(list(xout = almdout$x, deltaout = deltaout,
-                    trans = almdout$trans, lhout = almdout$lh, dsout = dsout,
-                    eout = eout, aout = aout))
+      if (is.null(tparam)){
+        deltaout <- drawdelta(u = eout,alpha = alpha, k = k)
+      } else { ## draw inverse gamma
+        deltaout <- drawt(u = eout, alpha = tparam, beta = (tscale^2) * tparam)
+      }
+
+      if (dscore){ ## reduce delta to a f(delta) for mdd calculation
+        dsout <- fd(deltaout, tparam)
+      } else {
+        dsout <- NULL
+      }
+
+      return(list(xout = almdout$x, deltaout = deltaout,
+                  trans = almdout$trans, lhout = almdout$lh, dsout = dsout,
+                  eout = eout, aout = aout))
     }
-}
+  }
 
 
-impulseplots = function(ir, ## array of impulse response objects, nvar x nshock x nperiod
-                        irdraws = NULL, ## nvar x nshock x nperiod x ndraw
-                        conf = c(.68,.90), ## what confidence bands to put on the plot
-                        blocks = NULL, ## possible block structure, see below for example
-                        filename = 'impulse_plot',
-                        format = 'pdf',
-                        addtitle = FALSE, ## put a big title on the top?
-                        nsteps = 60, ## number of steps to use
-                        shocknames = NULL, ## names of the shocks to print as titles
-                        varnames = rep('',dim(ir)[1]), ## names of the response variables
-                        ptype = 'Impulse response', ## part of the title in some cases
-                        color = c(0, 0, 1), ## base color (default blue)
-                        alpha = c(0.5,0.3), ## how much alpha for each oonf band color
-                        gr = 0.7, ## what shade of grey
-                        width = 5, ## inches
-                        height = 8,
-                        response_ylim = NULL, ## can specify the size of each response row
-                        xtick = NULL ## where to put xticks; default, every 12 months
-                        ) {
+impulseplots <-
+  function(ir, ## array of impulse response objects, nvar x nshock x nperiod
+           irdraws = NULL, ## nvar x nshock x nperiod x ndraw
+           conf = c(.68,.90), ## what confidence bands to put on the plot
+           blocks = NULL, ## possible block structure, see below for example
+           filename = 'impulse_plot',
+           format = 'pdf',
+           addtitle = FALSE, ## put a big title on the top?
+           nsteps = 60, ## number of steps to use
+           shocknames = NULL, ## names of the shocks to print as titles
+           varnames = rep('',dim(ir)[1]), ## names of the response variables
+           ptype = 'Impulse response', ## part of the title in some cases
+           color = c(0, 0, 1), ## base color (default blue)
+           alpha = c(0.5,0.3), ## how much alpha for each oonf band color
+           gr = 0.7, ## what shade of grey
+           width = 5, ## inches
+           height = 8,
+           response_ylim = NULL, ## can specify the size of each response row
+           xtick = NULL ## where to put xticks; default, every 12 months
+  ) {
 
     ## Plots impulse response draws
     ## more current than other code in the same folder
-    ## Handles blocking of the impulse responses into several minigarphs 
+    ## Handles blocking of the impulse responses into several minigarphs
 
-###################################################################################
 
     require(grDevices)
-    
-    
+
+
     ## Some formatting issues
     ## filename = paste('/home/karthik/R/svar_kit/plotting/plots/', filename,sep='')
-    
-    
-    if (format == 'pdf'){ ## different methods for the "light color" for pdf and eps
-        shades = rgb(color[1], color[2], color[3], alpha)
-    } else if (format == 'eps'){
-        trellis.device(device="postscript", color = TRUE)
-        #setEPS()
-        ## postscript(filename, width = width, height = height)
 
-        # Cannot do transparent colors, so here is a crude workaround
-        alphafy = function(col,alpha=1) {
-              rr = 1-alpha*(1-c(col/255))
-              return(rgb(rr[1],rr[2],rr[3]))
+
+    if (format == 'pdf'){ ## different methods for the "light color" for pdf and eps
+      shades <- rgb(color[1], color[2], color[3], alpha)
+    } else if (format == 'eps'){
+      trellis.device(device="postscript", color = TRUE)
+      #setEPS()
+      ## postscript(filename, width = width, height = height)
+
+      # Cannot do transparent colors, so here is a crude workaround
+      alphafy <-
+        function(col,alpha=1) {
+          rr <-
+            1-alpha*(1-c(col/255))
+          return(rgb(rr[1],rr[2],rr[3]))
         }
-        color = alphafy(color, alpha)
-        
+      color <- alphafy(color, alpha)
+
     } #else raise some kind of error?
 
     if (is.null(varnames)){ ## get the names of each shock
-        varnames = rownames(ir)
+      varnames <- rownames(ir)
     }
 
     if (is.null(xtick)){
-        xtick = seq(1,nsteps,by=12)
+      xtick <- seq(1,nsteps,by=12)
     }
 
     ##
@@ -1738,127 +1718,128 @@ impulseplots = function(ir, ## array of impulse response objects, nvar x nshock 
     ## y limits for plots
     ##
 
-    nv = dim(ir)[1] ## variables
-    ns = dim(ir)[2] ## shocks
+    nv <- dim(ir)[1] ## variables
+    ns <- dim(ir)[2] ## shocks
 
-    ir  = ir[,,1:nsteps] ## trimming unnecessary steps
+    ir  <- ir[,,1:nsteps] ## trimming unnecessary steps
 
     if (!is.null(irdraws)){
-        ## get the correct quantiles
-        irq = apply(irdraws[,,1:nsteps,],1:3,quantile,
-                    ##probs = c(rev((1 - conf) / 2), .5 + conf/2))
-                    probs = c((1-conf)/2,0.5 + conf/2))
-        irq = aperm(irq,perm=c(2,3,4,1))
+      ## get the correct quantiles
+      irq <- apply(irdraws[,,1:nsteps,],1:3,quantile,
+                   ##probs <- c(rev((1 - conf) / 2), .5 + conf/2))
+                   probs <- c((1-conf)/2,0.5 + conf/2))
+      irq <- aperm(irq,perm=c(2,3,4,1))
 
-        nconf = length(conf)
+      nconf <- length(conf)
     } else{
-        irq = array(0,c(dim(ir),1))
-        nconf = NULL
+      irq <- array(0,c(dim(ir),1))
+      nconf <- NULL
     }
 
     ## determine the ylimits for each variable, if necessary
     if (is.null(response_ylim)){
-        response_ylim = matrix(0,nv,2) ## idea is that this should be identical for all blocks
-        for (iv in 1:nv){
-            response_ylim[iv,1] = min(ir[iv,,],irq[iv,,,],0)
-            response_ylim[iv,2] = max(ir[iv,,],irq[iv,,,],0)
-        }
+      response_ylim <- matrix(0,nv,2) ## idea is that this should be identical for all blocks
+      for (iv in 1:nv){
+        response_ylim[iv,1] <- min(ir[iv,,],irq[iv,,,],0)
+        response_ylim[iv,2] <- max(ir[iv,,],irq[iv,,,],0)
+      }
     }
-        
+
     ##
     ## Blocking prep
     ##
 
     if (is.null(blocks)){
-        blocks = list()
-        blocks[[1]] = list(x = 1:nv, y = 1:nv)
+      blocks <- list()
+      blocks[[1]] <- list(x = 1:nv, y = 1:nv)
     }
-    
-    nb = length(blocks)
-    
+
+    nb <- length(blocks)
+
     for (ib in 1:nb){
 
-        ## open the file
-        if (format == 'pdf'){ 
-            fname = paste(filename,'_',ib,'.pdf', sep = '')    
-            pdf(fname, width = width, height = height)
-        } else if (format == 'eps'){
-            fname = paste(filename,'_',ib,'.pdf', sep = '')
-            trellis.device(device="postscript", color = TRUE)
-            postscript(fname,width=width,height=height)        
-        }
+      ## open the file
+      if (format == 'pdf'){
+        fname <- paste(filename,'_',ib,'.pdf', sep = '')
+        pdf(fname, width = width, height = height)
+      } else if (format == 'eps'){
+        fname <- paste(filename,'_',ib,'.pdf', sep = '')
+        trellis.device(device="postscript", color = TRUE)
+        postscript(fname,width=width,height=height)
+      }
 
 
-        par(mfrow = c(length(blocks[[ib]]$x),length(blocks[[ib]]$y)),
-            col.lab="black",col.main="black",
-            oma=c(1,5,1,2), mar=c(.5,.25,.5,.25), tcl=-0.1, mgp=c(3,1,0))
+      par(mfrow = c(length(blocks[[ib]]$x),length(blocks[[ib]]$y)),
+          col.lab="black",col.main="black",
+          oma=c(1,5,1,2), mar=c(.5,.25,.5,.25), tcl=-0.1, mgp=c(3,1,0))
 
 
-        for (rv in blocks[[ib]]$x){ ## responses
-            
-            ptitle = varnames[rv] ## name of data series
+      for (rv in blocks[[ib]]$x){ ## responses
 
-            for (sv in blocks[[ib]]$y){ ## shocks
-                plot(ir[rv,sv,],
-                     ylim = response_ylim[rv,],
-                     type = 'l',
-                     lwd = 0.5,
-                     xlab = '',
-                     ylab = '',
-                     yaxt  = 'n',
-                     xaxt = 'n',
-                     ## fg = gray(gr),
-                     xlim = c(1,nsteps), xaxs = 'i')
+        ptitle <- varnames[rv] ## name of data series
 
-                ytick = pretty(response_ylim[rv,],4)
+        for (sv in blocks[[ib]]$y){ ## shocks
+          plot(ir[rv,sv,],
+               ylim <- response_ylim[rv,],
+               type <- 'l',
+               lwd <- 0.5,
+               xlab <- '',
+               ylab <- '',
+               yaxt  <- 'n',
+               xaxt <- 'n',
+               ## fg <- gray(gr),
+               xlim <- c(1,nsteps), xaxs = 'i')
 
-                abline(h = ytick, lty = 'dotted')## ,col=gray(gr))
-                abline(v = xtick, lty = 'dotted') ## ,col=gray(gr))
-                
-                abline(a=0,b=0,lwd=0.75)
+          ytick <- pretty(response_ylim[rv,],4)
 
-                if (!is.null(nconf)){ ## plot confidence bands
-                    for (ic in 1:nconf){
-                        polygon(c(1:nsteps, nsteps:1),
-                                c(irq[rv,sv,,ic],rev(irq[rv,sv,,ic+nconf])),
-                                col = shades[ic],
-                                border = NA)
-                    }
-                }
+          abline(h = ytick, lty = 'dotted')## ,col=gray(gr))
+          abline(v = xtick, lty = 'dotted') ## ,col=gray(gr))
 
-                ##Adding variable name and axis on leftmost plot
-                if (sv == blocks[[ib]]$y[1]){
-                    mtext(ptitle, side = 2, line = 5, cex = 0.5, las = 1, adj = 0)
-                    axis(side = 2, cex.axis = .75, las = 1,at=ytick)
-                }
+          abline(a=0,b=0,lwd=0.75)
 
-                ## ##Right side axis labels on right most plot
-                ## if (sv == blocks[[ib]]$y[length(blocks[[ib]]$y)]){
-                ##     axis(side = 4, cex.axis = .75, las = 1)
-                ## }
-
-                ##Shock name if appropriate
-                if (!is.null(shocknames) &&
-                    rv == blocks[[ib]]$x[1]) {
-                    mtext(shocknames[sv], side = 3, line = 0, cex = .5)
-                }
+          if (!is.null(nconf)){ ## plot confidence bands
+            for (ic in 1:nconf){
+              polygon(c(1:nsteps, nsteps:1),
+                      c(irq[rv,sv,,ic],rev(irq[rv,sv,,ic+nconf])),
+                      col = shades[ic],
+                      border = NA)
             }
-        }
+          }
 
-        if (addtitle){
-            bigtitle = paste(type, 'over', as.character(nSteps), 'periods', sep = ' ')
-            title(bigtitle, outer = TRUE, cex = 1.2)
-        }
+          ##Adding variable name and axis on leftmost plot
+          if (sv == blocks[[ib]]$y[1]){
+            mtext(ptitle, side = 2, line = 5, cex = 0.5, las = 1, adj = 0)
+            axis(side = 2, cex.axis = .75, las = 1,at=ytick)
+          }
 
-        dev.off()
+          ## ##Right side axis labels on right most plot
+          ## if (sv == blocks[[ib]]$y[length(blocks[[ib]]$y)]){
+          ##     axis(side = 4, cex.axis = .75, las = 1)
+          ## }
+
+          ##Shock name if appropriate
+          if (!is.null(shocknames) &&
+              rv == blocks[[ib]]$x[1]) {
+            mtext(shocknames[sv], side = 3, line = 0, cex = .5)
+          }
+        }
+      }
+
+      if (addtitle){
+        bigtitle <- paste(type, 'over', as.character(nSteps), 'periods', sep = ' ')
+        title(bigtitle, outer = TRUE, cex = 1.2)
+      }
+
+      dev.off()
 
     }
-}
+  }
 
 
 
-IrRun2 = function(x, modeA, modeLmd, listData, lcA0, lcLmd, nLags = nLags,
-                 owflag = FALSE, aflag = FALSE, ..., nStep = 60, rootcheck = FALSE, lrange = 1:6){
+IrRun2 <-
+  function(x, modeA, modeLmd, listData, lcA0, lcLmd, nLags = nLags,
+           owflag = FALSE, aflag = FALSE, ..., nStep = 60, rootcheck = FALSE, lrange = 1:6){
     ## Main function for drawing impulse responses
     ## It's written in a funny way, with a single draw input x, to facilitate use with
     ## lapply and its multicore version, mclapply
@@ -1885,261 +1866,261 @@ IrRun2 = function(x, modeA, modeLmd, listData, lcA0, lcLmd, nLags = nLags,
     ## --------------------OUTPUTS--------------------
     ## list with element ir, the impulse responses [nvar x nshock x nperiod x nregime]
     ## other stuff which is not so useful
-    
-    
+
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## January 2017
 
     ## END PREAMBLE
-######################################################################################
 
-    
+
     ## if (length(x) > (sum(lcA0) + sum(lcLmd))){ ## oweights in the mix
     if (owflag){
-        oweights = matrix(x[-(1:(sum(lcA0) + sum(lcLmd)))],
-                            dim(listData$Y)[1] - nLags,dim(lcA0)[1])
+      oweights <- matrix(x[-(1:(sum(lcA0) + sum(lcLmd)))],
+                         dim(listData$Y)[1] - nLags,dim(lcA0)[1])
     } else {
-        oweights = NULL
+      oweights <- NULL
     }
-        
+
     if (aflag){ ## aplus is already included
-        dimAplus = c(nrow(lcA0),ncol(lcA0),nLags)
-        Aplus = matrix(x[-(1:(sum(lcA0) + sum(lcLmd)))],(nrow(lcA0))^2,nrow(lcA0))
+      dimAplus <- c(nrow(lcA0),ncol(lcA0),nLags)
+      Aplus <- matrix(x[-(1:(sum(lcA0) + sum(lcLmd)))],(nrow(lcA0))^2,nrow(lcA0))
 
-        A = matrix(0,nrow(lcA0),ncol(lcA0))
-        A[lcA0] = x[1:(sum(lcA0))]
+      A <- matrix(0,nrow(lcA0),ncol(lcA0))
+      A[lcA0] <- x[1:(sum(lcA0))]
 
 
-        lambda = matrix(0, dim(lcLmd)[1],dim(lcLmd)[2])
-        lambda[lcLmd] = x[sum(lcA0) + (1 : sum(lcLmd))]
-        lambda[,dim(lambda)[2]] = dim(lambda)[2] -
-            apply(lambda[,1:(dim(lambda)[2]-1),drop=FALSE],1,sum)
+      lambda <- matrix(0, dim(lcLmd)[1],dim(lcLmd)[2])
+      lambda[lcLmd] <- x[sum(lcA0) + (1 : sum(lcLmd))]
+      lambda[,dim(lambda)[2]] <- dim(lambda)[2] -
+        apply(lambda[,1:(dim(lambda)[2]-1),drop=FALSE],1,sum)
 
-        nVar = dim(A)[1]
-        vars = colnames(lcA0)
+      nVar <- dim(A)[1]
+      vars <- colnames(lcA0)
 
-        lh = lh
+      lh <- lh
 
-        
+
     } else { ## needs to be calculated
-        
-        mlmodel = bvarwrap5(x, listData = listData, lcA0 = lcA0, lcLmd = lcLmd, oweights = oweights, verbose = TRUE, nLags = nLags, ...)
 
-        lh = mlmodel$lh
-        
-        ##add gaussian noise to A+
-        ##covariance matrix
-        Aplus = mlmodel$vout$var$By
-        u = mlmodel$vout$var$u
-        xx = mlmodel$vout$var$xx
-        nEq = dim(xx)[3]
-        nLags = dim(Aplus)[3]
-        xxi = list(nEq)
-        nX = nEq * nLags * nEq + nEq
-        ##arraySigma = array(0, dim = c(nX, nX, nEq)) 
-        ##xxi = solve(xx[,,1])
-        for (iEq in (1:dim(xx)[3])){
-            xxi[[iEq]] = solve(xx[,,iEq])
-        }
-        ##getting correct Sigma matrix
-        Sigma = bdiag(xxi)
-        ##coercing to matrix class....
-        Sigma = matrix(Sigma, nrow = nX)
+      mlmodel <- bvarwrap5(x, listData = listData, lcA0 = lcA0, lcLmd = lcLmd, oweights = oweights, verbose = TRUE, nLags = nLags, ...)
 
-        dimAplus = dim(Aplus)
-        ##for (iEq in 1:nEq) {
-        ##	xxi[,,iEq] = solve(xx[,,iEq])
-        ##}
-        covu = cov(u)
-        ##Sigma = kronecker(covu, xxi)
-        ##Sigma = kronecker(diag(dim(covu)[1]), xxi)
-        
-        ##calculating the noise
-        nDraws = dim(Sigma)[1]
-        ##sndraws = rnorm(nDraws) ##standard normal draws
-        ##draws = t(chol(Sigma)) %*% sndraws
-        nAplus = length(Aplus)        
-        ##mlmodel$vout$var$By = array(c(mlmodel$vout$var$By) +  draws[1:nBy],
-        ##  dim = dim(mlmodel$vout$var$By))
-        ##should not need to permute dimensions, change to matrix, etc.
+      lh <- mlmodel$lh
 
-        ##just to make sure, this is the postdraw() style implementation
-        sndraws = matrix(rnorm(nDraws), c(nDraws, 1))
-        matAplus = t(matrix(Aplus, nEq, nEq * nLags))
-#### Aplusdraws = t(chol(Sigma)) %*% sndraws
-        Aplusdraws = mvrnorm(1,rep(0,dim(Sigma)[1]),Sigma) #### new method?
-        Aplusnoise = matrix(Aplusdraws, c(nEq * nLags + 1, nEq)) ##i.e., the matrix of noise that I am adding to the posterior mean/mode
-        Aplus  = matAplus + Aplusnoise[1:(nEq*nLags),] ##ignoring the constant, which is last row
+      ##add gaussian noise to A+
+      ##covariance matrix
+      Aplus <- mlmodel$vout$var$By
+      u <- mlmodel$vout$var$u
+      xx <- mlmodel$vout$var$xx
+      nEq <- dim(xx)[3]
+      nLags <- dim(Aplus)[3]
+      xxi <- list(nEq)
+      nX <- nEq * nLags * nEq + nEq
+      ##arraySigma <- array(0, dim = c(nX, nX, nEq))
+      ##xxi = solve(xx[,,1])
+      for (iEq in (1:dim(xx)[3])){
+        xxi[[iEq]] <- solve(xx[,,iEq])
+      }
+      ##getting correct Sigma matrix
+      Sigma <- bdiag(xxi)
+      ##coercing to matrix class....
+      Sigma <- matrix(Sigma, nrow = nX)
 
-        ##cleaning pointers, etc.
-        A = mlmodel$A
-        vout = mlmodel$vout
-        lambda = mlmodel$lambda
-        nVar = dim(A)[1]
-        vars = colnames(A)
+      dimAplus <- dim(Aplus)
+      ##for (iEq in 1:nEq) {
+      ##	xxi[,,iEq] = solve(xx[,,iEq])
+      ##}
+      covu <- cov(u)
+      ##Sigma <- kronecker(covu, xxi)
+      ##Sigma <- kronecker(diag(dim(covu)[1]), xxi)
+
+      ##calculating the noise
+      nDraws <- dim(Sigma)[1]
+      ##sndraws <- rnorm(nDraws) ##standard normal draws
+      ##draws <- t(chol(Sigma)) %*% sndraws
+      nAplus <- length(Aplus)
+      ##mlmodel$vout$var$By <- array(c(mlmodel$vout$var$By) +  draws[1:nBy],
+      ##  dim <- dim(mlmodel$vout$var$By))
+      ##should not need to permute dimensions, change to matrix, etc.
+
+      ##just to make sure, this is the postdraw() style implementation
+      sndraws <- matrix(rnorm(nDraws), c(nDraws, 1))
+      matAplus <- t(matrix(Aplus, nEq, nEq * nLags))
+      #### Aplusdraws <- t(chol(Sigma)) %*% sndraws
+      Aplusdraws <- mvrnorm(1,rep(0,dim(Sigma)[1]),Sigma) #### new method?
+      Aplusnoise <- matrix(Aplusdraws, c(nEq * nLags + 1, nEq)) ##i.e., the matrix of noise that I am adding to the posterior mean/mode
+      Aplus  <- matAplus + Aplusnoise[1:(nEq*nLags),] ##ignoring the constant, which is last row
+
+      ##cleaning pointers, etc.
+      A <- mlmodel$A
+      vout <- mlmodel$vout
+      lambda <- mlmodel$lambda
+      nVar <- dim(A)[1]
+      vars <- colnames(A)
 
     }
-    
 
-    Aplus  = array(t(Aplus), dim = dimAplus)
 
-    ##Aplus = mlmodel$vout$var$By ##cancelling variation in Aplus
+    Aplus  <- array(t(Aplus), dim = dimAplus)
+
+    ##Aplus <- mlmodel$vout$var$By ##cancelling variation in Aplus
     ##above I only unocmmented to see if X'X singularites were creating problems
-    
 
-    ##nLambdas = dim(lambda)[2]
+
+    ##nLambdas <- dim(lambda)[2]
     ##Now a lambda range is set in the function call
-    
-    ir = array(0, dim = c(nVar, nVar, nStep, length(lrange)))
 
-    ##        isgood = rep(0, nLambdas)
-    ##        maxmod = rep(0, nLambdas) ##potentially are same across variance regimes, but I want to check
-    ##        maxRev = rep(0, nLambdas)
-    ##        iscomplex = rep(0, nLambdas)
-    
+    ir <- array(0, dim = c(nVar, nVar, nStep, length(lrange)))
+
+    ##        isgood <- rep(0, nLambdas)
+    ##        maxmod <- rep(0, nLambdas) ##potentially are same across variance regimes, but I want to check
+    ##        maxRev <- rep(0, nLambdas)
+    ##        iscomplex <- rep(0, nLambdas)
+
     for (iLambda in lrange){
-        By = array(0, dim = dimAplus)
-        Ainv <- solve(A)
-        smat <- Ainv %*% diag(sqrt(lambda[,iLambda]))
-        for (iLag in (1:nLags)) {
-            By[,,iLag] = Ainv %*% Aplus[,,iLag]
-        }
+      By <- array(0, dim = dimAplus)
+      Ainv <- solve(A)
+      smat <- Ainv %*% diag(sqrt(lambda[,iLambda]))
+      for (iLag in (1:nLags)) {
+        By[,,iLag] <- Ainv %*% Aplus[,,iLag]
+      }
 
-        tempvar = list()
-        tempvar$By = By
-        ir[,,,which(lrange == iLambda)] = impulsdtrf(tempvar, smat = smat, nstep = nStep)
-        dimnames(ir[,,,which(lrange == iLambda)])[[1]] = vars
+      tempvar <- list()
+      tempvar$By <- By
+      ir[,,,which(lrange == iLambda)] <- impulsdtrf(tempvar, smat = smat, nstep = nStep)
+      dimnames(ir[,,,which(lrange == iLambda)])[[1]] <- vars
     }
 
-    newordering = NULL ## didn't check
-    badshift = NULL
+    newordering <- NULL ## didn't check
+    badshift <- NULL
     if (rootcheck){
-        rc = CheckRoots(By)
-        isgood = rc$isgood
-        maxmod = rc$maxmod
-        iscomplex = rc$iscomplex
-        maxRev = rc$maxRev
-        modmod = rc$modmod
-        return(list(ir=ir, noloop = newordering$noloop, badshift = badshift,
-                    orderings = newordering$ordrng, ch = newordering$changes,
-                    trimprove = newordering$trimprove, x = x, isgood = isgood,
-                    maxmod = maxmod, iscomplex = iscomplex,
-                    maxRev = maxRev, modmod = modmod, lh = lh))
+      rc <- CheckRoots(By)
+      isgood <- rc$isgood
+      maxmod <- rc$maxmod
+      iscomplex <- rc$iscomplex
+      maxRev <- rc$maxRev
+      modmod <- rc$modmod
+      return(list(ir=ir, noloop = newordering$noloop, badshift = badshift,
+                  orderings = newordering$ordrng, ch = newordering$changes,
+                  trimprove = newordering$trimprove, x = x, isgood = isgood,
+                  maxmod = maxmod, iscomplex = iscomplex,
+                  maxRev = maxRev, modmod = modmod, lh = lh))
     } else{
-        return(list(ir = ir,noloop = newordering$noloop, badshift = badshift,
-                    orderings = newordering$ordrng, ch = newordering$changes,
-                    trimprove = newordering$trimprove, x = x, lh = lh))
+      return(list(ir = ir,noloop = newordering$noloop, badshift = badshift,
+                  orderings = newordering$ordrng, ch = newordering$changes,
+                  trimprove = newordering$trimprove, x = x, lh = lh))
     }
-}                   
+  }
 
 
-linreg = function(iq, lmdseries, X, ya0, drawbe = FALSE){
+linreg <- function(iq, lmdseries, X, ya0, drawbe = FALSE){
 
-    errorflag = FALSE
-    
-    wt <- exp(.5 * lmdseries[iq, ])
-    ## weighting by exp(lmd/2), so log error variances are -lmd
-    Xq <-  wt * X
-    yq <- wt * ya0[ , iq]
-    
-    ## set up exception for weights that blow up lsfit: so 
-    ## minimization can proceed, knowing such models are not very likely...
-    if (any(Xq == Inf) || any(yq == Inf) || any(wt < .Machine$double.eps) ||
-	any(is.nan(Xq)) || any(is.na(Xq))){
-        errorflag = TRUE
-        return(errorflag)
+  errorflag <- FALSE
+
+  wt <- exp(.5 * lmdseries[iq, ])
+  ## weighting by exp(lmd/2), so log error variances are -lmd
+  Xq <-  wt * X
+  yq <- wt * ya0[ , iq]
+
+  ## set up exception for weights that blow up lsfit: so
+  ## minimization can proceed, knowing such models are not very likely...
+  if (any(Xq == Inf) || any(yq == Inf) || any(wt < .Machine$double.eps) ||
+      any(is.nan(Xq)) || any(is.na(Xq))){
+    errorflag <- TRUE
+    return(errorflag)
+  }
+
+
+  lso <- lsfit(Xq, yq, intercept=FALSE)
+  ## intercept already in X. resids should be unit vce.
+  ## B[ , iq] <- lso$coefficients
+  Rq <- qr.R(lso$qr)
+  xx <- crossprod(Rq)
+
+  if (drawbe){ ## draw from the conditional posterior on the coefficients
+
+    xxi <- solve(xx)
+
+    ## coefs_noise <- mvrnorm(1,rep(0,length(lso$coefficients)),xxi)
+    exxi <- eigen(xxi)
+    if (any(exxi$values < 1e-14)){ ## seems like reasonable tolerance
+      coefs_draw <- NULL
+      udraw <- NULL
+      snglty <- TRUE
+      logdetxxi <- -Inf
+    } else {
+      coefs_noise <- exxi$vectors %*% diag(sqrt(exxi$values)) %*% rnorm(dim(xxi)[1])
+      coefs_draw <- lso$coefficients + coefs_noise
+      udraw <- lso$residuals - Xq %*% coefs_noise
+      logdetxxi <- sum(log(exxi$values))
+      snglty <- FALSE
     }
-    
-    
-    lso <- lsfit(Xq, yq, intercept=FALSE)
-    ## intercept already in X. resids should be unit vce.
-    ## B[ , iq] <- lso$coefficients
-    Rq <- qr.R(lso$qr)
-    xx = crossprod(Rq)
+  } else { ## no coefs draw
+    coefs_draw <- rep(NA,length(lso$coefficients))
+    udraw <- rep(NA,length(lso$residuals))
+    logdetxxi <- -2 * sum(log(abs(diag(Rq))))
+    snglty <- (logdetxxi == -Inf)
+  }
 
-    if (drawbe){ ## draw from the conditional posterior on the coefficients
-        
-        xxi = solve(xx)
+  ## set up exception for singular crossprod(Rq).
+  ## not combined with above for debugging
 
-        ## coefs_noise = mvrnorm(1,rep(0,length(lso$coefficients)),xxi)
-        exxi = eigen(xxi)
-        if (any(exxi$values < 1e-14)){ ## seems like reasonable tolerance
-            coefs_draw = NULL
-            udraw = NULL
-            snglty = TRUE
-            logdetxxi = -Inf
-        } else {
-            coefs_noise = exxi$vectors %*% diag(sqrt(exxi$values)) %*% rnorm(dim(xxi)[1])
-            coefs_draw = lso$coefficients + coefs_noise
-            udraw = lso$residuals - Xq %*% coefs_noise
-            logdetxxi = sum(log(exxi$values))
-            snglty = FALSE
-        }
-    } else { ## no coefs draw
-        coefs_draw = rep(NA,length(lso$coefficients))
-        udraw = rep(NA,length(lso$residuals))
-        logdetxxi = -2 * sum(log(abs(diag(Rq))))
-        snglty = (logdetxxi == -Inf)
-    }
-    
-    ## set up exception for singular crossprod(Rq).
-    ## not combined with above for debugging
-    
-    ## cp = crossprod(Rq)
-    ## if (kappa(cp) > 1/(1000*.Machine$double.eps)){ #checking condition number
-    ## 	errorflag = TRUE
-    ## 	return(errorflag)
-    ## }
-    ## xxi[ , , iq] = solve(cp)
-    
-    ## u[ , iq] <- lso$residuals
-    ## logdetxxi[iq] <- -2 * sum(log(abs(diag(Rq))))
-    ## snglty[iq] <- (logdetxxi[iq] == -Inf)
-    
-    
-    return(list(errorflag = errorflag, coefs = lso$coefficients, u = lso$residuals, 
-                logdetxxi = logdetxxi, snglty = snglty, xx = xx,
-                coefs_draw = coefs_draw, udraw = udraw))
+  ## cp <- crossprod(Rq)
+  ## if (kappa(cp) > 1/(1000*.Machine$double.eps)){ #checking condition number
+  ## 	errorflag <- TRUE
+  ## 	return(errorflag)
+  ## }
+  ## xxi[ , , iq] <- solve(cp)
+
+  ## u[ , iq] <- lso$residuals
+  ## logdetxxi[iq] <- -2 * sum(log(abs(diag(Rq))))
+  ## snglty[iq] <- (logdetxxi[iq] == -Inf)
+
+
+  return(list(errorflag = errorflag, coefs = lso$coefficients, u = lso$residuals,
+              logdetxxi = logdetxxi, snglty = snglty, xx = xx,
+              coefs_draw = coefs_draw, udraw = udraw))
 }
 
 
-logmean = function(x){
+logmean <-
+  function(x){
 
     ## Little function to calculate harmonic means of really big or really small log quantities
-    
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## August 2016
 
     ## END PREAMBLE
-######################################################################################
 
-    lm = rep(0,4)
+    lm <- rep(0,4)
 
     ## 1. simple
-    lm[1] = log(mean(exp(x)))
+    lm[1] <- log(mean(exp(x)))
 
     ## 2. demeaned
-    mn = mean(x)
-    xdm = x - mn
-    lm[2] = (mn) + log(mean(exp(xdm)))
+    mn <- mean(x)
+    xdm <- x - mn
+    lm[2] <- (mn) + log(mean(exp(xdm)))
 
     ## 3. trimmed
-    lm[3] = log(mean(exp(x), trim = 0.2))
+    lm[3] <- log(mean(exp(x), trim = 0.2))
 
     ## 4. trimmed dm
-    lm[4] = (mn) + log(mean(exp(xdm), trim = 0.2))
+    lm[4] <- (mn) + log(mean(exp(xdm), trim = 0.2))
 
     return(lm)
-}
+  }
 
 
-McmcIr = function(xout, model, rootcheck = FALSE, lrange = 1:6, cores = 8,
-                  oweights = NULL,
-                  aplus = NULL, ## don't need both oweights and aplus
-                  nStep = 60, hparam = rep(0,7))
-{
+McmcIr <-
+  function(xout, model, rootcheck = FALSE, lrange = 1:6, cores = 8,
+           oweights = NULL,
+           aplus = NULL, ## don't need both oweights and aplus
+           nStep = 60, hparam = rep(0,7))
+  {
 
     ## Main wrapper function for drawing impulse responses
 
@@ -2157,529 +2138,526 @@ McmcIr = function(xout, model, rootcheck = FALSE, lrange = 1:6, cores = 8,
     ## --------------------OUTPUTS--------------------
     ## list with element ir, the impulse responses [nvar x nshock x nperiod x nregime x ndraws]
     ## other stuff which is less useful (mainly related to orderings/permutations)
-    
+
     ## Karthik Sastry
     ## R 3.1.2, 64 Bit
     ## January 2017
 
     ## END PREAMBLE
-######################################################################################
 
 
     library(parallel)
     library(MASS)
     library(coda)
 
-    vars = colnames(model$A)
+    vars <- colnames(model$A)
 
-    nTrials = dim(xout)[1]
+    nTrials <- dim(xout)[1]
 
-    nX = dim(xout)[1]
+    nX <- dim(xout)[1]
     if (is.null(nX)) {
-        nX = 1
-        dim(xout) = c(1,length(xout))
+      nX <- 1
+      dim(xout) <- c(1,length(xout))
     }
 
     if (!is.null(oweights)){ ## add these to x
-        ## xout = cbind(xout, matrix(0,dim(xout)[1],
-        ##                           dim(oweights)[1] * dim(oweights)[2]))
-        ## xout[,-c(1:dim(xout)[2])] = matrix(oweights,dim(xout)[1],
-        ##                                    dim(oweights)[1] * dim(oweights)[2],
-        ##                                    byrow = TRUE)
+      ## xout <- cbind(xout, matrix(0,dim(xout)[1],
+      ##                           dim(oweights)[1] * dim(oweights)[2]))
+      ## xout[,-c(1:dim(xout)[2])] <- matrix(oweights,dim(xout)[1],
+      ##                                    dim(oweights)[1] * dim(oweights)[2],
+      ##                                    byrow = TRUE)
 
-        owmat = matrix(oweights,dim(xout)[1],
-                                  dim(oweights)[1] * dim(oweights)[2],
-                                  byrow = TRUE)
-        xout = cbind(xout, owmat)
+      owmat <- matrix(oweights,dim(xout)[1],
+                      dim(oweights)[1] * dim(oweights)[2],
+                      byrow = TRUE)
+      xout <- cbind(xout, owmat)
 
-        owflag = TRUE
+      owflag <- TRUE
     } else {
-        owflag = FALSE
+      owflag <- FALSE
     }
 
     if (!is.null(aplus)){
-        na = dim(aplus)[1] ## need to remove last row
-        amat = matrix(aplus[-na,,],
-                      dim(aplus)[3],
-                      (na-1) * dim(aplus)[2],
-                      byrow = TRUE)
-        xout = cbind(xout, amat)
-        aflag = TRUE
+      na <- dim(aplus)[1] ## need to remove last row
+      amat <- matrix(aplus[-na,,],
+                     dim(aplus)[3],
+                     (na-1) * dim(aplus)[2],
+                     byrow = TRUE)
+      xout <- cbind(xout, amat)
+      aflag <- TRUE
     } else{
-        aflag = FALSE
+      aflag <- FALSE
     }
-        
+
 
     ## if (!is.null(aplus)){ ## add these to x
-    ##     xout = cbind(xout, matrix(0,dim(xout)[1],
+    ##     xout <- cbind(xout, matrix(0,dim(xout)[1],
     ##                               dim(oweights)[1] * dim(oweights)[2]))
-    ##     xout[,-c(1:dim(xout)[2])] = matrix(oweights,dim(xout)[1],
+    ##     xout[,-c(1:dim(xout)[2])] <- matrix(oweights,dim(xout)[1],
     ##                                        dim(oweights)[1] * dim(oweights)[2],
     ##                                        byrow = TRUE)
     ## }
 
-    
-    listXout = lapply(1:nX, function(iRow){xout[iRow,]})
 
-    listIrtrials = mclapply(listXout, IrRun2, model$A,
-                            model$lmd, model$listData, model$lcA,
-                            model$lcLmd, nLags = model$nLags,
-                            owflag = owflag, aflag = aflag,
-                            lmdblock = model$lmdblock,
-                            hparam = hparam,
-                            Tsigbrk = model$Tsigbrk, pparams = model$pparams,
-                            lmdPrior = model$lmdPrior, rootcheck = rootcheck,
-                            lrange = lrange, nStep = nStep, mc.cores = cores)
+    listXout <- lapply(1:nX, function(iRow){xout[iRow,]})
+
+    listIrtrials <- mclapply(listXout, IrRun2, model$A,
+                             model$lmd, model$listData, model$lcA,
+                             model$lcLmd, nLags = model$nLags,
+                             owflag = owflag, aflag = aflag,
+                             lmdblock = model$lmdblock,
+                             hparam = hparam,
+                             Tsigbrk = model$Tsigbrk, pparams = model$pparams,
+                             lmdPrior = model$lmdPrior, rootcheck = rootcheck,
+                             lrange = lrange, nStep = nStep, mc.cores = cores)
 
     ##save(listIrtrials, file = 'rawIR.Rdata')
 
-    ##irdim = dim(listIrtrials[[1]]$ir)
+    ##irdim <- dim(listIrtrials[[1]]$ir)
 
     ##arrayIrtrials = array(sapply(listIrtrials, '[[', 1), dim = c(irdim, nTrials))
 
-    ##percentiles = apply(arrayIrtrials, 1:4, FUN = quantile, probs = c(.05,.5,.95))
+    ##percentiles <- apply(arrayIrtrials, 1:4, FUN = quantile, probs = c(.05,.5,.95))
 
-    elements = c('ir','ch','orderings','badshift','trimprove','x','lh')
-    if (rootcheck) elements = c(elements, 'isgood','maxmod', 'maxRev', 'iscomplex','modmod')
-    output = list()
+    elements <- c('ir','ch','orderings','badshift','trimprove','x','lh')
+    if (rootcheck) elements <- c(elements, 'isgood','maxmod', 'maxRev', 'iscomplex','modmod')
+    output <- list()
     for (iElement in elements){
-        iObject = sapply(listIrtrials,'[[',iElement)
-        if (is.null(dim(iObject))) iObject = unlist(iObject)
-        output[[iElement]] = iObject
+      iObject <- sapply(listIrtrials,'[[',iElement)
+      if (is.null(dim(iObject))) iObject <- unlist(iObject)
+      output[[iElement]] <- iObject
     }
 
-    output$ir = array(output$ir, dim = c(length(vars), length(vars), 60, length(lrange), nTrials))
+    output$ir <- array(output$ir, dim = c(length(vars), length(vars), 60, length(lrange), nTrials))
 
     if (class(xout) == 'mcmc'){
-        output$x = mcmc(t(output$x), thin = thin(xout))
+      output$x <- mcmc(t(output$x), thin = thin(xout))
     }
-    output$ess = effectiveSize(output$x)
-    if (rootcheck) output$iscomplex = t(output$iscomplex)
+    output$ess <- effectiveSize(output$x)
+    if (rootcheck) output$iscomplex <- t(output$iscomplex)
 
     return(output)
+  }
+
+
+msvreg <- function(dmat,
+                   hd = 3,
+                   hi = 3,
+                   rel = TRUE,
+                   ratio = FALSE,
+                   nlag = 0,
+                   verbose = FALSE,
+                   ngdp = NULL){
+
+  ## Runs single equation OLS inspired by Mian, Sufi, and Verner [and other
+  ## papers in the "projection regression" literature]
+  ## y_{t + hd} - y_{t} = lhs variable
+  ## (c/y)_{t-1} - (c/y)_{t-1-hi} = main rhs variable
+  ## for each ilag, add y_{t - ilag} - y_{t - ilag - hd}
+
+  ## -------------------- INPUTS --------------------
+  ## dmat : matrix of dependent variables. It's assumed that
+  ##        column 1 is REAL output
+  ##        columns 2 to N are the credit variables
+  ## ngdp: specify this as a T x 1 vector of nominal gdp, or log real + log price level
+  ## hd and hi: size of difference for dependent and independent variables respectively
+  ## rel : if TRUE, take independent variable relative to GDP
+  ## ratio: if TRUE, take ind. variable as ratio to GDP
+  ## nlag: number of lags of real GDP to add to right hand side
+  ## verbose : if true, return (fake) data
+
+
+  T <- dim(dmat)[1]
+
+  ## preparing the dep. var
+  depvar <- matrix(NA,T,1)
+  depvar[1:(T-hd)] <- dmat[(hd+1):T,1] - dmat[1:(T-hd),1]
+
+
+
+  ## preparing the independent variables
+  ncredit <- dim(dmat)[2] - 1
+  indvar <- matrix(NA,T,ncredit)
+
+  creditvar <- dmat[,-1,drop=FALSE] ## this works no matter how many there are
+
+  if (is.null(ngdp)){
+    ## scale with real
+    scalegdp <- dmat[,1]
+  } else {
+    scalegdp <- ngdp
+  }
+
+  if (rel){
+    ## relative to GDP
+    ## log ratio is one option
+    creditvar <- creditvar - scalegdp
+
+    if (ratio){
+      ## but can also use the absolute ratio
+      creditvar <- exp(creditvar)
+    }
+
+  }
+
+  indvar[(hi+2):T,] =
+    as.matrix(creditvar[(hi+1):(T-1),] - ## t-1
+                creditvar[1:(T-1-hi),]) ## t-1-hi
+  sd <- c(sd(indvar[,1],na.rm=TRUE),sd(indvar[,2],na.rm=TRUE))
+
+  ## adding lags if desired
+  if (nlag > 0){
+    lagmat <- matrix(NA,T,nlag)
+    diffY <- c(0,diff(c(dmat[,1])))
+    for (ilag in 1:nlag){
+      ## lagmat[(hd +ilag):T,ilag]  <- depvar[1:(T-hd-ilag)]
+      lagmat[(1 +ilag):T,ilag]  <- diffY[1:(T-ilag)]
+    }
+    indvar <- cbind(indvar,lagmat)
+  }
+
+  ## running the regression
+  regout <- lm(depvar ~ indvar)
+  regout$sd <- sd
+
+
+  if (!verbose){
+    return(regout)
+  } else {
+    return(list(regout = regout, depvar = depvar, indvar = indvar))
+  }
 }
 
 
-msvreg = function(dmat,
-                  hd = 3,
-                  hi = 3,
-                  rel = TRUE,
-                  ratio = FALSE,
-                  nlag = 0,
-                  verbose = FALSE,
-                  ngdp = NULL){
 
-    ## Runs single equation OLS inspired by Mian, Sufi, and Verner [and other
-    ## papers in the "projection regression" literature]
-    ## y_{t + hd} - y_{t} = lhs variable
-    ## (c/y)_{t-1} - (c/y)_{t-1-hi} = main rhs variable
-    ## for each ilag, add y_{t - ilag} - y_{t - ilag - hd}
 
-    ## -------------------- INPUTS --------------------
-    ## dmat : matrix of dependent variables. It's assumed that
-    ##        column 1 is REAL output
-    ##        columns 2 to N are the credit variables
-    ## ngdp: specify this as a T x 1 vector of nominal gdp, or log real + log price level
-    ## hd and hi: size of difference for dependent and independent variables respectively
-    ## rel : if TRUE, take independent variable relative to GDP
-    ## ratio: if TRUE, take ind. variable as ratio to GDP
-    ## nlag: number of lags of real GDP to add to right hand side
-    ## verbose : if true, return (fake) data
 
-    ## ----------------------------------------
 
-    T = dim(dmat)[1]
-    
-    ## preparing the dep. var
-    depvar = matrix(NA,T,1)
-    depvar[1:(T-hd)] = dmat[(hd+1):T,1] - dmat[1:(T-hd),1]
-    
-
-    
-    ## preparing the independent variables
-    ncredit = dim(dmat)[2] - 1
-    indvar = matrix(NA,T,ncredit)
-    
-    creditvar = dmat[,-1,drop=FALSE] ## this works no matter how many there are
-
-    if (is.null(ngdp)){
-        ## scale with real
-        scalegdp = dmat[,1]
-    } else {
-        scalegdp = ngdp
-    }
-    
-    if (rel){
-        ## relative to GDP
-        ## log ratio is one option
-        creditvar = creditvar - scalegdp
-
-        if (ratio){
-            ## but can also use the absolute ratio
-            creditvar = exp(creditvar)
-        }
-        
-    }
-
-    indvar[(hi+2):T,] =
-        as.matrix(creditvar[(hi+1):(T-1),] - ## t-1
-        creditvar[1:(T-1-hi),]) ## t-1-hi
-    sd = c(sd(indvar[,1],na.rm=TRUE),sd(indvar[,2],na.rm=TRUE))
-    
-    ## adding lags if desired
-    if (nlag > 0){
-        lagmat = matrix(NA,T,nlag)
-        diffY = c(0,diff(c(dmat[,1])))
-        for (ilag in 1:nlag){
-            ## lagmat[(hd +ilag):T,ilag]  = depvar[1:(T-hd-ilag)]
-            lagmat[(1 +ilag):T,ilag]  = diffY[1:(T-ilag)]
-        }
-        indvar = cbind(indvar,lagmat)
-    }
-
-    ## running the regression
-    regout = lm(depvar ~ indvar)
-    regout$sd = sd
-    
-
-    if (!verbose){
-        return(regout)
-    } else {
-        return(list(regout = regout, depvar = depvar, indvar = indvar))
-    }
-}
-
-        
-
-        
-
-        
 
 
 normAlmd <- function(Aml, lmdml, A, lmd) {
-    if(is.null(dim(lmd))) lmd <- matrix(lmd, length(lmd), 1)
-    if(is.null(dim(lmdml))) lmdml <- matrix(lmdml, length(lmdml), 1)   
-    nsig <- dim(lmd)[2]
-    nv <- dim(lmd)[1]
-    ## normalize diagonal of A, just in case
-    sf <- diag(A)
+  if(is.null(dim(lmd))) lmd <- matrix(lmd, length(lmd), 1)
+  if(is.null(dim(lmdml))) lmdml <- matrix(lmdml, length(lmdml), 1)
+  nsig <- dim(lmd)[2]
+  nv <- dim(lmd)[1]
+  ## normalize diagonal of A, just in case
+  sf <- diag(A)
+  A <- (1/sf) * A
+  lmd <- lmd - 2 * c(log(abs(sf)))        #vector of log sf's gets reused, col by col
+  Alml <- array(0, c(nv, nv, nsig))
+  Al <- Alml
+  for (il in 1:nsig) {
+    Alml[ , , il] <- exp(-.5 * lmdml[ , il]) * Aml
+    Al[ , , il] <- exp(-.5 * lmd[ , il]) * A
+  }
+  Alml <- matrix(Alml, nv)
+  Al <- matrix(Al, nv)
+  xp <- abs(Al %*% t(Alml))
+  xp <- log(xp) #better approach to avoiding zeros on diagonal, orthogonal rows, etc.
+  xpo <- xp #to check later if trace actually increased
+  ## xp <- abs(cor(t(Al), t(Alml)))
+  ## Algorithm tries reordering up to nv times to find an invariant ordering,
+  ## then gives up and returns nv'th reordering and noloop=FALSE
+  ordrng <- 1:nv
+  crit <- vector("numeric", nv)
+  noloop <- 0
+  for (ntrial in 1:nv) {
+    thisOrdrng <- 1:nv
+    ## Make any switch with 1 that increases trace(xp), then any with 2, etc.
+    for (iv in 1:nv) {
+      for (iv2 in iv:nv) {
+        crit[iv2] <- xp[iv2,iv] - xp[iv,iv] + xp[iv,iv2] - xp[iv2,iv2]
+      }
+      idtr <- which.max(crit[iv:nv])
+      newiv <- thisOrdrng[iv:nv][idtr]
+      thisOrdrng[iv:nv][idtr] <- thisOrdrng[iv]
+      thisOrdrng[iv] <- newiv
+      Al <- Al[thisOrdrng, ]
+      xp <- xp[thisOrdrng, ]
+    }
+    ordrng <- ordrng[thisOrdrng]
+    if (all(thisOrdrng == 1:nv)) {
+      noloop <- ntrial
+      break
+    }
+  }
+
+  trimprove <- sum(diag(xp)) >= sum(diag(xpo))
+
+
+  A <- A[ordrng, ]
+  sf <- diag(A)
+
+  badshift <- any(sf < .Machine$double.eps)
+
+  if (badshift){
+    A <- Aml
+    lmd <- lmdml
+  } else {
     A <- (1/sf) * A
-    lmd <- lmd - 2 * c(log(abs(sf)))        #vector of log sf's gets reused, col by col
-    Alml <- array(0, c(nv, nv, nsig))
-    Al <- Alml
-    for (il in 1:nsig) {
-        Alml[ , , il] <- exp(-.5 * lmdml[ , il]) * Aml
-        Al[ , , il] <- exp(-.5 * lmd[ , il]) * A
-    }
-    Alml <- matrix(Alml, nv)
-    Al <- matrix(Al, nv)
-    xp <- abs(Al %*% t(Alml))
-    xp = log(xp) #better approach to avoiding zeros on diagonal, orthogonal rows, etc.
-    xpo = xp #to check later if trace actually increased
-    ## xp <- abs(cor(t(Al), t(Alml)))
-    ## Algorithm tries reordering up to nv times to find an invariant ordering,
-    ## then gives up and returns nv'th reordering and noloop=FALSE
-    ordrng <- 1:nv
-    crit <- vector("numeric", nv)
-    noloop <- 0
-    for (ntrial in 1:nv) {
-        thisOrdrng <- 1:nv
-        ## Make any switch with 1 that increases trace(xp), then any with 2, etc.
-        for (iv in 1:nv) {
-            for (iv2 in iv:nv) {
-                crit[iv2] <- xp[iv2,iv] - xp[iv,iv] + xp[iv,iv2] - xp[iv2,iv2]
-            }
-            idtr <- which.max(crit[iv:nv])
-            newiv <- thisOrdrng[iv:nv][idtr]
-            thisOrdrng[iv:nv][idtr] <- thisOrdrng[iv]
-            thisOrdrng[iv] <- newiv
-            Al <- Al[thisOrdrng, ]
-            xp <- xp[thisOrdrng, ]
-        }
-        ordrng <- ordrng[thisOrdrng]
-        if (all(thisOrdrng == 1:nv)) {
-            noloop <- ntrial
-            break
-        }
-    }
+    lmd <- lmd[ordrng, ] - 2 *c(log(abs(sf)))
+  }
 
-    trimprove = sum(diag(xp)) >= sum(diag(xpo))
-
-
-    A <- A[ordrng, ]
-    sf <- diag(A)
-
-    badshift = any(sf < .Machine$double.eps)
-    
-    if (badshift){
-        A = Aml
-        lmd = lmdml
-    } else {
-        A <- (1/sf) * A
-        lmd <- lmd[ordrng, ] - 2 *c(log(abs(sf)))
-    }
-
-    changes = any(ordrng != 1:nv)
-    return(list(Anormed=A , lmdnormed=lmd, ordrng=ordrng, noloop=noloop, badshift = badshift, changes = changes, trimprove = trimprove))
+  changes <- any(ordrng != 1:nv)
+  return(list(Anormed=A , lmdnormed=lmd, ordrng=ordrng, noloop=noloop, badshift = badshift, changes = changes, trimprove = trimprove))
 }
 
 
-plotfc = function(fcout, ydata, dateseq,
-                  vnames, fulldates,
-                  ymat = c(4.35,4.70,
-                           4.55,4.65,
-                           8.2,8.5,
-                           7.00,7.40,
-                           7.20,7.60,
-                           -0.02,0.06,
-                           5.6,6.4,
-                           -0.01,0.05,
-                           0.00,0.12,
-                           -0.01,0.05),
-                  filename = 'fcout',
-                  cushion = 0){
+plotfc <- function(fcout, ydata, dateseq,
+                   vnames, fulldates,
+                   ymat = c(4.35,4.70,
+                            4.55,4.65,
+                            8.2,8.5,
+                            7.00,7.40,
+                            7.20,7.60,
+                            -0.02,0.06,
+                            5.6,6.4,
+                            -0.01,0.05,
+                            0.00,0.12,
+                            -0.01,0.05),
+                   filename = 'fcout',
+                   cushion = 0){
 
-    ## Come up with a nice way of plotting all the forecasts
-    ## assume ydata starts at datseq[1]
-    
-    nfwd = dim(fcout)[1] ## how far fwd does each fc go
-    nx = dim(fcout)[2]
-    nd = dim(fcout)[3] ## number of dates
+  ## Come up with a nice way of plotting all the forecasts
+  ## assume ydata starts at datseq[1]
 
-    ## fulldates = seq(from = datseq[1], to = datseq[nd], by = 'month') ## dates for yvec
-    
-    ymat = matrix(ymat, nrow = 2)
-    fclist = list()
-    
-    ## make everything a time series
+  nfwd <- dim(fcout)[1] ## how far fwd does each fc go
+  nx <- dim(fcout)[2]
+  nd <- dim(fcout)[3] ## number of dates
+
+  ## fulldates <- seq(from = datseq[1], to = datseq[nd], by = 'month') ## dates for yvec
+
+  ymat <- matrix(ymat, nrow = 2)
+  fclist <- list()
+
+  ## make everything a time series
+  for (idate in 1:nd){
+    ## sdate <- seq(from = datseq[idate], length = 2, by = 'month')
+    ## sdate <- sdate[2] ## month after
+
+    sdate <- dateseq[idate]
+    iy <- which(fulldates == dateseq[idate])
+    yt <- ydata[iy,] # y data
+
+    fclist[[idate]] <- ts(rbind(yt,fcout[,,idate]),
+                          start =
+                            c(as.numeric(format(sdate,format = '%Y')),
+                              as.numeric(format(sdate,format = '%m'))),
+                          frequency = 12)
+    ## ylist[[idate]] = ts(yt,
+    ##                     start =
+    ##                         c(as.numeric(format(sdate,format = '%Y')),
+    ##                           as.numeric(format(sdate,format = '%m'))),
+    ##                     frequency = 12)
+  }
+
+  ## ystart = which(fulldates == dateseq[1])
+  ## yend = which(fulldates == dateseq[nd]) + 1 + nfwd
+
+  ## ytrim = ts(ydata[ystart:yend,],
+  ##            start =
+  ##                c(as.numeric(format(dateseq[1],format = '%Y')),
+  ##                  as.numeric(format(dateseq[1],format = '%m'))),
+  ##            frequency = 12)
+
+  ytrim <- ts(ydata,
+              start =
+                c(as.numeric(format(fulldates[1],format = '%Y')),
+                  as.numeric(format(fulldates[1],format = '%m'))),
+              frequency = 12)
+
+
+
+
+
+
+
+  pdf(paste(filename,'.pdf',sep = ''),width = 6.5, height = 8)
+
+  ## plotting, could be adjusted for nv
+  par(mfrow = c(5,2),col.lab="black",col.main="black",
+      oma=c(4,4,4,4), mar=c(2,2,2,2), tcl=-0.1, mgp=c(0,0,0))
+
+  for (iv in 1:nx){
+    plot(
+      ## ts(tsdata[fullrange,iv],start = c(2006,9),frequency = 12),
+      ytrim[,iv],
+      type = 'l', lwd = 1.5,
+      ylab = '',xlab = '',
+      ylim = ymat[,iv])
+    title(main = vnames[iv])
+
+    grid(nx = NULL, ny = nx, col = "lightgray", lty = "dotted",
+         lwd = 1, equilogs = TRUE)
+
     for (idate in 1:nd){
-        ## sdate = seq(from = datseq[idate], length = 2, by = 'month')
-        ## sdate = sdate[2] ## month after
-
-        sdate = dateseq[idate]
-        iy = which(fulldates == dateseq[idate])
-        yt = ydata[iy,] # y data
-
-        fclist[[idate]] = ts(rbind(yt,fcout[,,idate]),
-                             start =
-                                 c(as.numeric(format(sdate,format = '%Y')),
-                                   as.numeric(format(sdate,format = '%m'))),
-                             frequency = 12)
-        ## ylist[[idate]] = ts(yt,
-        ##                     start =
-        ##                         c(as.numeric(format(sdate,format = '%Y')),
-        ##                           as.numeric(format(sdate,format = '%m'))),
-        ##                     frequency = 12)
+      lines(fclist[[idate]][,iv], lwd = .75, col = 'red')
     }
-
-    ## ystart = which(fulldates == dateseq[1])
-    ## yend = which(fulldates == dateseq[nd]) + 1 + nfwd
-
-    ## ytrim = ts(ydata[ystart:yend,],
-    ##            start =
-    ##                c(as.numeric(format(dateseq[1],format = '%Y')),
-    ##                  as.numeric(format(dateseq[1],format = '%m'))),
-    ##            frequency = 12)
-
-    ytrim = ts(ydata,
-               start =
-                   c(as.numeric(format(fulldates[1],format = '%Y')),
-                     as.numeric(format(fulldates[1],format = '%m'))),
-               frequency = 12)
-        
-
-    
+  }
 
 
-
-    
-    pdf(paste(filename,'.pdf',sep = ''),width = 6.5, height = 8)
-
-    ## plotting, could be adjusted for nv
-    par(mfrow = c(5,2),col.lab="black",col.main="black",
-        oma=c(4,4,4,4), mar=c(2,2,2,2), tcl=-0.1, mgp=c(0,0,0))
-
-    for (iv in 1:nx){
-        plot(
-            ## ts(tsdata[fullrange,iv],start = c(2006,9),frequency = 12),
-            ytrim[,iv],
-            type = 'l', lwd = 1.5,
-            ylab = '',xlab = '',
-            ylim = ymat[,iv])
-        title(main = vnames[iv])
-
-        grid(nx = NULL, ny = nx, col = "lightgray", lty = "dotted",
-                  lwd = 1, equilogs = TRUE)
-        
-        for (idate in 1:nd){
-            lines(fclist[[idate]][,iv], lwd = .75, col = 'red')
-        }
-    }
-
-
-    dev.off()
+  dev.off()
 }
 
 
-plotrmse = function(sdate, rmse1, rmse2, rmse3, filename,
-    vname = rep(NULL,nv), ih = 1, height = 8, width = 6.5, diff = FALSE,
-    rshade = TRUE){
+plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
+                     vname = rep(NULL,nv), ih = 1, height = 8, width = 6.5, diff = FALSE,
+                     rshade = TRUE){
 
-    nv = dim(rmse1)[2]
+  nv <- dim(rmse1)[2]
 
-    pdf(paste(filename,'.pdf',sep = ''),height = 8, width = 6.5)
-    
-    par(mfrow = c(nv,1),col.lab="black",col.main="black",
-        oma=c(1,3,1,2), mar=c(2,1,1,1), tcl=-0.1, mgp=c(0,0,0))
+  pdf(paste(filename,'.pdf',sep = ''),height = 8, width = 6.5)
 
-    nrmse = c(1,6,12,24,48) ## number of months
-    nrmse = nrmse[ih]
-    ## snip these off the end
-    T = dim(rmse1)[3]
+  par(mfrow = c(nv,1),col.lab="black",col.main="black",
+      oma=c(1,3,1,2), mar=c(2,1,1,1), tcl=-0.1, mgp=c(0,0,0))
 
-    irange = 1:(T-nrmse)
+  nrmse <- c(1,6,12,24,48) ## number of months
+  nrmse <- nrmse[ih]
+  ## snip these off the end
+  T <- dim(rmse1)[3]
 
-    ## rmse1 = rmse1[,,1:(T-nrmse)]
-    ## rmse2 = rmse1[,,1:(T-nrmse)]
-    ## rmse3 = rmse1[,,1:(T-nrmse)]
+  irange <- 1:(T-nrmse)
 
-    if (rshade) {
-        ## gen list of recessions
-        rlist = c(1980, 1980 + 6/12,
-                  1981 + 6/12,  1982 + 10/12,
-                  1990 + 6/12, 1991 + 2/12,
-                  2001 + 2/12, 2001 + 10/12,
-                  2007 + 11/12, 2009 + 5/12)
-        rlist = matrix(rlist,2,5)
-    }
+  ## rmse1 <- rmse1[,,1:(T-nrmse)]
+  ## rmse2 <- rmse1[,,1:(T-nrmse)]
+  ## rmse3 <- rmse1[,,1:(T-nrmse)]
+
+  if (rshade) {
+    ## gen list of recessions
+    rlist <- c(1980, 1980 + 6/12,
+               1981 + 6/12,  1982 + 10/12,
+               1990 + 6/12, 1991 + 2/12,
+               2001 + 2/12, 2001 + 10/12,
+               2007 + 11/12, 2009 + 5/12)
+    rlist <- matrix(rlist,2,5)
+  }
 
 
-    for (iv in 1:nv){
-        ## plot each variable
+  for (iv in 1:nv){
+    ## plot each variable
 
-        if (diff){
-            ## difference mode
+    if (diff){
+      ## difference mode
 
-            drmse = rmse1[ih,iv,] - rmse2[ih,iv,]
+      drmse <- rmse1[ih,iv,] - rmse2[ih,iv,]
 
-            plot(ts(drmse,sdate,frequency = 12), type = 'l', lwd = 1,
-                 ylab = NULL, xlab = NULL)
-            abline(a = 0, b = 0, lwd = 0.75) ## axis
-            grid(lwd = .5)
+      plot(ts(drmse,sdate,frequency = 12), type = 'l', lwd = 1,
+           ylab = NULL, xlab = NULL)
+      abline(a = 0, b = 0, lwd = 0.75) ## axis
+      grid(lwd = .5)
 
-        } else {
-            ##ymin = min(rmse1[ih,iv,],rmse2[ih,iv,])
-            ymin = 0
-            ymax = max(rmse1[ih,iv,],rmse2[ih,iv,]) * 1.1 ## breathing room
+    } else {
+      ##ymin <- min(rmse1[ih,iv,],rmse2[ih,iv,])
+      ymin <- 0
+      ymax <- max(rmse1[ih,iv,],rmse2[ih,iv,]) * 1.1 ## breathing room
 
-            ## plot(ts(rmse1[ih,iv,],sdate,frequency=12), type = 'l', lwd = .75, col = 'blue',
-            ##      ylab = NULL, xlab = NULL, bty = 'l',ylim = c(ymin,ymax))
+      ## plot(ts(rmse1[ih,iv,],sdate,frequency=12), type = 'l', lwd = .75, col = 'blue',
+      ##      ylab = NULL, xlab = NULL, bty = 'l',ylim = c(ymin,ymax))
 
-            plot(ts(rmse1[ih,iv,],sdate,frequency=12), type = 'n', lwd = .75, col = 'blue',
-                 ylab = NULL, xlab = NULL, bty = 'l',ylim = c(ymin,ymax), panel.first = {
-                     grid(lwd = 1)
-                 })
+      plot(ts(rmse1[ih,iv,],sdate,frequency=12), type = 'n', lwd = .75, col = 'blue',
+           ylab = NULL, xlab = NULL, bty = 'l',ylim = c(ymin,ymax), panel.first = {
+             grid(lwd = 1)
+           })
 
-            if (rshade){
-                for (ir in 1:5){
+      if (rshade){
+        for (ir in 1:5){
 
-                    polygon(c(rlist[,ir],rev(rlist[,ir])),
-                            c(-1e10,-1e10,1e10,1e10),
-                            col = 'grey',border = NA)
-                }
-            }
-
-            lines(ts(rmse1[ih,iv,irange],sdate,frequency=12), lwd = .75, col = 'blue')
-            lines(ts(rmse2[ih,iv,irange],sdate,frequency=12),lwd = .75, col = 'red')
-            lines(ts(rmse3[ih,iv,irange],sdate,frequency=12),lwd = .75, col = 'green4')
-
-            ## abline(a = 0, b = 0, lwd = 0.75) ## axis
-            
-
+          polygon(c(rlist[,ir],rev(rlist[,ir])),
+                  c(-1e10,-1e10,1e10,1e10),
+                  col = 'grey',border = NA)
         }
+      }
+
+      lines(ts(rmse1[ih,iv,irange],sdate,frequency=12), lwd = .75, col = 'blue')
+      lines(ts(rmse2[ih,iv,irange],sdate,frequency=12),lwd = .75, col = 'red')
+      lines(ts(rmse3[ih,iv,irange],sdate,frequency=12),lwd = .75, col = 'green4')
+
+      ## abline(a = 0, b = 0, lwd = 0.75) ## axis
 
 
-        title(main = vname[iv])
-
-        
     }
 
-    dev.off()
+
+    title(main = vname[iv])
+
+
+  }
+
+  dev.off()
 }
 
 
 pparams <- function(listData, mnstart = 1, mntight = 3, mndecay = 0.5, vprior = 0,
                     urlambda = 5, urmu = 1, adiag = 1, cosprior = NULL) {
 
-    ## Generates a list with all the priors/stuff for bvarWrap4
-    ## Intended to keep some of the repetitive stuff outside of iteration/make it easier to tweak
+  ## Generates a list with all the priors/stuff for bvarWrap4
+  ## Intended to keep some of the repetitive stuff outside of iteration/make it easier to tweak
 
-    nVar = dim(listData$Y)[2]
-    varnames = dimnames(listData$Y)[[2]]
+  nVar <- dim(listData$Y)[2]
+  varnames <- dimnames(listData$Y)[[2]]
 
-    if (!is.null(mntight)){ #### if mn prior is specified
-        mnprior = list(tight = mntight, decay = mndecay)
-    } else {
-        mnprior = NULL #### no mnprior
-    }
+  if (!is.null(mntight)){ #### if mn prior is specified
+    mnprior <- list(tight = mntight, decay = mndecay)
+  } else {
+    mnprior <- NULL #### no mnprior
+  }
 
-    ## cosprior just passes through
-    ## specify one or the other, probably not both
-        
+  ## cosprior just passes through
+  ## specify one or the other, probably not both
 
-    ##these options are grandfathered in, from a time before we thought it was necessary
-    ##to tweak vprior. Else vprior is just specified as a vector
-    ##Could raise an error if length vprior != nVars
-    if (length(vprior) == 1 && vprior == 0){
-        vprior = list(sig = rep(.01,nVar), w = 0)
-    } else if (length(vprior) == 1 && vprior == 1){
-        ##quick fix: vprior needs to recognize that some variables are percentage points
-        vprior = list(sig = c(.01,.01,.01,1,.01,1,1,1), w = 0)
-        ## three log, one pct pt rate, one log, 3 pct pt rate
-    } else { ##if full vprior is provided
-        vprior = list(sig = vprior, w = 0)
-    }
 
-    asig <- 2
-    asd <- outer(vprior$sig, 1/vprior$sig)
-    
-    urprior <- list(lambda = urlambda, mu = urmu)
+  ##these options are grandfathered in, from a time before we thought it was necessary
+  ##to tweak vprior. Else vprior is just specified as a vector
+  ##Could raise an error if length vprior != nVars
+  if (length(vprior) == 1 && vprior == 0){
+    vprior <- list(sig = rep(.01,nVar), w = 0)
+  } else if (length(vprior) == 1 && vprior == 1){
+    ##quick fix: vprior needs to recognize that some variables are percentage points
+    vprior <- list(sig = c(.01,.01,.01,1,.01,1,1,1), w = 0)
+    ## three log, one pct pt rate, one log, 3 pct pt rate
+  } else { ##if full vprior is provided
+    vprior <- list(sig = vprior, w = 0)
+  }
 
-    sigfix <- diag(vprior$sig^2)
+  asig <- 2
+  asd <- outer(vprior$sig, 1/vprior$sig)
 
-    names(vprior$sig) = varnames
-    dimnames(sigfix) = list(varnames, varnames)
+  urprior <- list(lambda = urlambda, mu = urmu)
 
-    return(list(urprior = urprior, asig = asig, mnprior = mnprior, vprior = vprior, asd = asd, mnstart = mnstart, adiag = adiag, cosprior = cosprior))
+  sigfix <- diag(vprior$sig^2)
+
+  names(vprior$sig) <- varnames
+  dimnames(sigfix) <- list(varnames, varnames)
+
+  return(list(urprior = urprior, asig = asig, mnprior = mnprior, vprior = vprior, asd = asd, mnstart = mnstart, adiag = adiag, cosprior = cosprior))
 
 }
 
 
-restrictVAR <- function(vout, type=c("3", "KF","SVhtskd"), rmat=NULL, yzrone=NULL, xzrone=NULL,
-                        const=NULL, cyzr=NULL, cxzr=NULL) {
+restrictVAR <-
+  function(vout, type=c("3", "KF","SVhtskd"), rmat=NULL, yzrone=NULL, xzrone=NULL,
+           const=NULL, cyzr=NULL, cxzr=NULL) {
     ## restrictions can be specified as rows of rmat, with coefficients applied to elements of By and Bx
     ## stacked as they are in xxi (and then repeated across the equation index), or they can be specified
     ## in yzrone, xzrone.  Each zero element of yzrone or xzrone generates a restriction that sets the corresponding
     ## coefficient in By or Bx to zero (or to a constant, if !is.null(const)).  Both kinds of restrictions
     ## can be non-trivial in the same call.
-    ##-------------------------------------------
+
     ## type:     vout as from rfvar3 ("3") or as from rfvarKF ("KF")
     ## const:    the right hand side of rmat %*% coeff = const, not the constant in the var.
     ## cyzr, cxzr:  If using yzrone, xzrone with non-trivial constants, leave const=NULL and specify
     ##           constants with cyzr and cxzr
-    ##------------------------------------------
     ## sc:       The Schwarz criterion rejects the restriction if the chisq value plus the sc value
     ##           is positive.  This version of the sc is scale-sensitive.  Variables with higher
     ##           variance are penalized more strongly, as with a prior that expects higher-variance
     ##           variables to explain more variance.
     ##
-    ##------------------------------------------------
     ## Note 2013-3-4:  Try eliminating scale effects by converting X'X to correlation matrix
     if (length(type) > 1) type <- type[1]
     if (type == "SVhtskd") {
-        require("tensor")
-        bvw <- vout
-        vout <- bvw$vout$var
+      require("tensor")
+      bvw <- vout
+      vout <- bvw$vout$var
     }
     ncf <- dim(vout$By)[2] * dim(vout$By)[3] + dim(vout$Bx)[2]
     neq <- dim(vout$By)[1]
@@ -2687,112 +2665,112 @@ restrictVAR <- function(vout, type=c("3", "KF","SVhtskd"), rmat=NULL, yzrone=NUL
     lags <- dim(vout$By)[3]
     nx <- dim(vout$Bx)[2]
     if (is.null(rmat)) {
-        rmat <- matrix(0, 0, ncf *neq)
+      rmat <- matrix(0, 0, ncf *neq)
     }
     if (!is.null(yzrone)) {
-        byz <- which(yzrone == 0, arr.ind=TRUE)
-        nrstr <- dim(byz)[1]
-        if (is.null( cyzr)) cyzr <- array(0, dim(yzrone))
-        for (ir in 1:nrstr ) {
-            newrow <- rep(0, neq * ncf)
-            newrow[(byz[ir,1] - 1) * ncf + (byz[ir, 3] -1) * ny + byz[ir, 2]] <- 1
-            rmat <- rbind(rmat,newrow)
-        }
-        const <- c(const, cyzr[byz])
+      byz <- which(yzrone == 0, arr.ind=TRUE)
+      nrstr <- dim(byz)[1]
+      if (is.null( cyzr)) cyzr <- array(0, dim(yzrone))
+      for (ir in 1:nrstr ) {
+        newrow <- rep(0, neq * ncf)
+        newrow[(byz[ir,1] - 1) * ncf + (byz[ir, 3] -1) * ny + byz[ir, 2]] <- 1
+        rmat <- rbind(rmat,newrow)
+      }
+      const <- c(const, cyzr[byz])
     }
     if (!is.null(xzrone)) {
-        bxz <- which(xzrone == 0, arr.ind=TRUE )
-        nrstr <- dim(bxz)[1]
-        if (is.null(cxzr)) cxzr <- matrix(0, neq, nx)
-        for (ir in 1:nrstr)  {
-            newrow <- rep(0,ncf * neq)
-            newrow[(bxz[ir,1] - 1) * ncf + ny * lags + bxz[ir, 2]] <- 1
-            rmat <- rbind(rmat, newrow)
-        }
-        const <- c(const, cxzr[bxz])
+      bxz <- which(xzrone == 0, arr.ind=TRUE )
+      nrstr <- dim(bxz)[1]
+      if (is.null(cxzr)) cxzr <- matrix(0, neq, nx)
+      for (ir in 1:nrstr)  {
+        newrow <- rep(0,ncf * neq)
+        newrow[(bxz[ir,1] - 1) * ncf + ny * lags + bxz[ir, 2]] <- 1
+        rmat <- rbind(rmat, newrow)
+      }
+      const <- c(const, cxzr[bxz])
     }
     svdr <- svd(rmat)
     if (max(abs(svdr$d)) > 1e10 * min(abs(svdr$d))){
-        error("restrictions not full rank")
+      error("restrictions not full rank")
     }
     ## Note that t(rv) spans the same space as rmat, so the restrictiosn are crossprod(v,coeffs)=gamma
     ## rv <- svdr$v    #2013.5.9
     if (length(type) > 1) type <- type[1]
     T <- if (type == "3" || type == "SVhtskd") dim(vout$u)[1] else dim(vout$fcsterr)[1]
     if (type == "3") {
-        sig <- cov(vout$u)
-        svdsig <- svd(sig)
-        singsig <- (max(svdsig$d) > 1e10 * min(svdsig$d))
-        if(singsig) warning("Near singular sig matrix in restrictVAR")
-        svdxxi <- svd(vout$xxi)
-        singxxi <- (max(svdxxi$d) > 1e10 * min(svdxxi$d))
-        ## if(singxxi) warning("Near singular xxi matrix in restrictVAR")
-        ## schwarz <- rmat %*% kronecker(svdsig$u %*% diag(1/sqrt(svdsig$d)), svdxxi$u %*% diag(1/sqrt(svdxxi$d)))
-        ##schwarz <- kronecker((1/sqrt(svdsig$d)) * t(svdsig$u), (1/sqrt(svdxxi$d)) * t(svdxxi$u)) %*% rv  #2013.5.9
-        ## sqrtVb <- kronecker(sqrt(svdsig$d) * t(svdsig$u), 1/sqrt(svdxxi$d)) * t(svdxxi$u)
-        ## line above seems to be a mistake, since xxi is already x'x-inverse
-        sqrtVb <- kronecker(sqrt(svdsig$d) * t(svdsig$u), sqrt(svdxxi$d) * t(svdxxi$u))
-        dgVb <- apply(sqrtVb^2, 2, sum)
-        rmatC <- rmat %*% diag(sqrt(T * dgVb))
-        sqrtVbC <- sqrtVb %*% diag(1/sqrt(T * dgVb))
-        lndetVb <- sum(log(svdsig$d)) * dim(vout$xxi)[1] + sum(log(svdxxi$d)) * dim(sig)[1]
-        lndetVbC <- lndetVb - sum(log(dgVb * T))
+      sig <- cov(vout$u)
+      svdsig <- svd(sig)
+      singsig <- (max(svdsig$d) > 1e10 * min(svdsig$d))
+      if(singsig) warning("Near singular sig matrix in restrictVAR")
+      svdxxi <- svd(vout$xxi)
+      singxxi <- (max(svdxxi$d) > 1e10 * min(svdxxi$d))
+      ## if(singxxi) warning("Near singular xxi matrix in restrictVAR")
+      ## schwarz <- rmat %*% kronecker(svdsig$u %*% diag(1/sqrt(svdsig$d)), svdxxi$u %*% diag(1/sqrt(svdxxi$d)))
+      ##schwarz <- kronecker((1/sqrt(svdsig$d)) * t(svdsig$u), (1/sqrt(svdxxi$d)) * t(svdxxi$u)) %*% rv  #2013.5.9
+      ## sqrtVb <- kronecker(sqrt(svdsig$d) * t(svdsig$u), 1/sqrt(svdxxi$d)) * t(svdxxi$u)
+      ## line above seems to be a mistake, since xxi is already x'x-inverse
+      sqrtVb <- kronecker(sqrt(svdsig$d) * t(svdsig$u), sqrt(svdxxi$d) * t(svdxxi$u))
+      dgVb <- apply(sqrtVb^2, 2, sum)
+      rmatC <- rmat %*% diag(sqrt(T * dgVb))
+      sqrtVbC <- sqrtVb %*% diag(1/sqrt(T * dgVb))
+      lndetVb <- sum(log(svdsig$d)) * dim(vout$xxi)[1] + sum(log(svdxxi$d)) * dim(sig)[1]
+      lndetVbC <- lndetVb - sum(log(dgVb * T))
     } else if (type == "KF") {          #type=="KF"
-        svdVb <- svd(vout$Vb)
-        sqrtVb <- sqrt(diag(svdVb$d)) %*% t(svdVb$u)
-        dgVb <- diag(vout$Vb)
-        rmatC <- rmat %*% diag(sqrt(T * dgVb))
-        sqrtVbC <- sqrtVb %*% diag(1/sqrt(T * dgVb))
-        lndetVb <- sum(log(svdVb$d))
-        lndetVbC <- lndetVb - sum(log(dgVb * T))
-        ## schwarz <- rmat %*% svdVb$u %*% diag(1/sqrt(svdVb$d)) #below is more efficient version for large Vb
-        ## schwarz <- (1/sqrt(svdVb$d)) * (t(svdVb$u) %*% rv)
+      svdVb <- svd(vout$Vb)
+      sqrtVb <- sqrt(diag(svdVb$d)) %*% t(svdVb$u)
+      dgVb <- diag(vout$Vb)
+      rmatC <- rmat %*% diag(sqrt(T * dgVb))
+      sqrtVbC <- sqrtVb %*% diag(1/sqrt(T * dgVb))
+      lndetVb <- sum(log(svdVb$d))
+      lndetVbC <- lndetVb - sum(log(dgVb * T))
+      ## schwarz <- rmat %*% svdVb$u %*% diag(1/sqrt(svdVb$d)) #below is more efficient version for large Vb
+      ## schwarz <- (1/sqrt(svdVb$d)) * (t(svdVb$u) %*% rv)
     } else {                            #type="SVhtskd"
-        nv <- dim(vout$By)[1]
-        nX <- dim(vout$xxi)[1]
-        if (is.null(nX)) nX = dim(vout$xx)[1]
-        Vb <- matrix(0, nX * nv, nX * nv)
+      nv <- dim(vout$By)[1]
+      nX <- dim(vout$xxi)[1]
+      if (is.null(nX)) nX = dim(vout$xx)[1]
+      Vb <- matrix(0, nX * nv, nX * nv)
 
 
-        #check if xxi is missing
-        if (is.null(vout$xxi)){
-            #instead we have xx, which can be inverted to get xxi
-            vout$xxi = vout$xx
-            for (iv in 1:nv){
-                vout$xxi[,,iv] = solve(vout$xx[,,iv])
-            }
+      #check if xxi is missing
+      if (is.null(vout$xxi)){
+        #instead we have xx, which can be inverted to get xxi
+        vout$xxi = vout$xx
+        for (iv in 1:nv){
+          vout$xxi[,,iv] = solve(vout$xx[,,iv])
         }
-        
-        for (iq in 1:nv) {
-            Vb[nX * (iq-1) + 1:nX, nX * (iq-1) + 1:nX] <- vout$xxi[ , , iq]
-        }
-        
-        A0i <- solve(bvw$A)
-        Vb <- kronecker(A0i, diag(nX)) %*% Vb %*% kronecker(t(A0i), diag(nX))
-        svdVb <- svd(Vb)
+      }
 
-        sqrtVb <- sqrt(diag(svdVb$d)) %*% t(svdVb$u)
-        # KS note: is this correct?
-        sqrtVb2 = svdVb$u %*% sqrt(diag(svdVb$d)) %*% t(svdVb$u)
-        dgVb <- diag(Vb)
-        rmatC <- rmat %*% diag(sqrt(T * dgVb))
-        sqrtVbC <- sqrtVb %*% diag(1/sqrt(T *dgVb))
+      for (iq in 1:nv) {
+        Vb[nX * (iq-1) + 1:nX, nX * (iq-1) + 1:nX] <- vout$xxi[ , , iq]
+      }
 
-        lndetVb <- sum(log(svdVb$d))
-        lndetVbC <- lndetVb - sum(log(dgVb * T))
+      A0i <- solve(bvw$A)
+      Vb <- kronecker(A0i, diag(nX)) %*% Vb %*% kronecker(t(A0i), diag(nX))
+      svdVb <- svd(Vb)
+
+      sqrtVb <- sqrt(diag(svdVb$d)) %*% t(svdVb$u)
+      # KS note: is this correct?
+      sqrtVb2 = svdVb$u %*% sqrt(diag(svdVb$d)) %*% t(svdVb$u)
+      dgVb <- diag(Vb)
+      rmatC <- rmat %*% diag(sqrt(T * dgVb))
+      sqrtVbC <- sqrtVb %*% diag(1/sqrt(T *dgVb))
+
+      lndetVb <- sum(log(svdVb$d))
+      lndetVbC <- lndetVb - sum(log(dgVb * T))
     }
 
-    vr2 = (sqrtVb2 %*% t(rmat))
-    cvr2 = crossprod(vr2)
-    svdvr2 = svd(vr2)
-    
+    vr2 <- (sqrtVb2 %*% t(rmat))
+    cvr2 <- crossprod(vr2)
+    svdvr2 <- svd(vr2)
+
     svdvr <- svd(sqrtVb %*% t(rmat))
     svdvrC <- svd(sqrtVbC %*% t(rmatC)) #result == line above?
     vdim1 <- dim(svdvr$u)[1]
     svdvrp <- svd(diag(vdim1) - svdvr$u %*% t(svdvr$u), nu=vdim1 - dim(rmat)[1])
     svdvrpC <- svd(diag(vdim1) - svdvrC$u %*% t(svdvrC$u), nu=vdim1 - dim(rmat)[1])
-    svdvrpuv <- svd(crossprod(svdvrp$u, t(sqrtVb))) 
-    svdvrpuvC <- svd(crossprod(svdvrpC$u, t(sqrtVbC))) 
+    svdvrpuv <- svd(crossprod(svdvrp$u, t(sqrtVb)))
+    svdvrpuvC <- svd(crossprod(svdvrpC$u, t(sqrtVbC)))
     lndetUR <- sum(log(svdvrpuv$d))
     lndetURC <- sum(log(svdvrpuvC$d))
     df <- dim(rmat)[1]
@@ -2801,10 +2779,10 @@ restrictVAR <- function(vout, type=c("3", "KF","SVhtskd"), rmat=NULL, yzrone=NUL
     schwarzC <- lndetVbC - 2 * lndetURC + df * log(2 * pi)
     if(is.null(const)) const <- rep(0, dim(rmat)[1])
 
-    
+
     if(type == "SVhtskd") {
-        vout$By <- tensor(A0i, vout$By, 2, 1)
-        vout$Bx <- A0i %*% vout$Bx
+      vout$By <- tensor(A0i, vout$By, 2, 1)
+      vout$Bx <- A0i %*% vout$Bx
     }
     stackedcf <- c(t(cbind(matrix(vout$By, nrow=neq), vout$Bx)))
     gap <- rmat %*% stackedcf - const
@@ -2815,52 +2793,53 @@ restrictVAR <- function(vout, type=c("3", "KF","SVhtskd"), rmat=NULL, yzrone=NUL
     #trying with other sqrt matrix -- doesn't seem to make a difference?
     chstat4 = (1/svdvr2$d) * t(svdvr2$v) %*% gap
     chstat4 = crossprod(chstat4)
-    
+
     ## # alternate method?
     ## # seems to work better
-    iR = apply(rmat == 1, 2, sum)
-    rcoefs = stackedcf
-    lcR = (iR == 1)
-    rcoefs[!lcR] = 0
+    iR <- apply(rmat == 1, 2, sum)
+    rcoefs <- stackedcf
+    lcR <- (iR == 1)
+    rcoefs[!lcR] <- 0
     ## # rcoefs is zero for everything unrestricted, equal to coefficient for everything restricted
-    chstat2 = t(rcoefs) %*% solve(Vb) %*% rcoefs
+    chstat2 <- t(rcoefs) %*% solve(Vb) %*% rcoefs
 
     ## ## another alternate method : looking at implied difference in structural form coefficients
-    ##    newrfc = stackedcf
-    ##    newrfc[lcR] = 0
-    ##    stackedmat = t(cbind(matrix(vout$By, nrow = neq), vout$Bx))
-    ##    newstmat = array(newrfc, dim = dim(stackedmat))
-    ##    By = array(c(t(newstmat)), dim  = dim(vout$By))
+    ##    newrfc <- stackedcf
+    ##    newrfc[lcR] <- 0
+    ##    stackedmat <- t(cbind(matrix(vout$By, nrow = neq), vout$Bx))
+    ##    newstmat <- array(newrfc, dim = dim(stackedmat))
+    ##    By <- array(c(t(newstmat)), dim  = dim(vout$By))
 
     ##    for (i in dim(By)[3]){
-    ##        By[,,i] = bvw$A %*% By[,,i]
+    ##        By[,,i] <- bvw$A %*% By[,,i]
     ##    }
-    
-    ##    listXxi = lapply(1:dim(vout$xxi)[3], function(i) vout$xxi[,,i])
-    ##    covmat = matrix(bdiag(listXxi), nrow = length(listXxi) * dim(listXxi[[1]])[1])
-    
-    ##    oldstack = t(cbind(matrix(oldBy, nrow=neq), oldBx))
-    ##    newstack = t(cbind(matrix(By, nrow=neq), vout$Bx))
 
-    ##    difference = oldstack - newstack
-    
-    ##    chstat3 = t(c(difference)) %*% covmat %*% c(difference)
-    chstat3 = NULL
-    
+    ##    listXxi <- lapply(1:dim(vout$xxi)[3], function(i) vout$xxi[,,i])
+    ##    covmat <- matrix(bdiag(listXxi), nrow = length(listXxi) * dim(listXxi[[1]])[1])
+
+    ##    oldstack <- t(cbind(matrix(oldBy, nrow=neq), oldBx))
+    ##    newstack <- t(cbind(matrix(By, nrow=neq), vout$Bx))
+
+    ##    difference <- oldstack - newstack
+
+    ##    chstat3 <- t(c(difference)) %*% covmat %*% c(difference)
+    chstat3 <- NULL
+
     return(list(chiSquared=chstat, chstat2 = chstat2, chstat3 = chstat3,
                 chstat4= chstat4, df=df, sc=schwarz, pval=pchisq(chstat,df),
                 sc2 = schwarz - (ncf*neq-df)*log(1 - df/(neq*ncf)), scC=schwarzC))
-}
+  }
 
 
-rfrun = function(ydata,
-    xdata = NULL,
-    const = TRUE,
-    lags = 8,
-    nstep = 16,
-    mnprior = list(tight = 3, decay = .5),
-    urprior = list(lambda = 5, mu = 1),
-    vprior = list(sigma = rep(.01,nv), w = 1)){
+rfrun <-
+  function(ydata,
+           xdata = NULL,
+           const = TRUE,
+           lags = 8,
+           nstep = 16,
+           mnprior = list(tight = 3, decay = .5),
+           urprior = list(lambda = 5, mu = 1),
+           vprior = list(sigma = rep(.01,nv), w = 1)){
 
     ## runs reduced form regressions
     ## this specifies prior "externally" instead of in rfvar3
@@ -2873,173 +2852,168 @@ rfrun = function(ydata,
     ## nstep = number of steps of IR to calculate
     ## mnprior, urprior, vprior: parameters for var prior
 
-    ## ----------------------------------------
 
     ## so R doesnt complain later
-    vnames = colnames(ydata)
-    ydata = as.matrix(ydata)
-    nv = dim(ydata)[2]
-    
+    vnames <- colnames(ydata)
+    ydata <- as.matrix(ydata)
+    nv <- dim(ydata)[2]
+
     ## for the unit root prior
-    ybar = apply(ydata[1:lags, ], 2, mean)
-    
-    T = dim(ydata)[1]
-    nv = dim(ydata)[2]
+    ybar <- apply(ydata[1:lags, ], 2, mean)
+
+    T <- dim(ydata)[1]
+    nv <- dim(ydata)[2]
     if (const) {
-        xdata = cbind(xdata, matrix(1,T,1))
+      xdata <- cbind(xdata, matrix(1,T,1))
     }
     if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == T)
-    Tx = dim(xdata)[1]
-    nx = dim(xdata)[2]
+    Tx <- dim(xdata)[1]
+    nx <- dim(xdata)[2]
 
-        
+
     ## prior
-    vp = varprior(nv,nx,lags,mnprior,vprior, urprior=urprior, ybar=ybar) # vp$: ydum,xdum,pbreaks
-    varp = rfvar3(ydata = vp$ydum,
-        lags = lags,
-        xdata = vp$xdum,
-        lambda = NULL, mu = NULL, ic = NULL, const = FALSE)
+    vp <- varprior(nv,nx,lags,mnprior,vprior, urprior=urprior, ybar=ybar) # vp$: ydum,xdum,pbreaks
+    varp <- rfvar3(ydata = vp$ydum,
+                   lags = lags,
+                   xdata = vp$xdum,
+                   lambda = NULL, mu = NULL, ic = NULL, const = FALSE)
 
     ## posterior mode of standard model
-    var = rfvar3(ydata = rbind(ydata, vp$ydum),
-        lags = lags,
-        xdata = rbind(xdata, vp$xdum),
-        lambda = NULL, mu = NULL, ic = NULL, const = FALSE,
-        breaks = matrix(c(dim(ydata)[1], dim(ydata)[1]+ vp$pbreaks),ncol=1))
+    var <- rfvar3(ydata = rbind(ydata, vp$ydum),
+                  lags = lags,
+                  xdata = rbind(xdata, vp$xdum),
+                  lambda = NULL, mu = NULL, ic = NULL, const = FALSE,
+                  breaks = matrix(c(dim(ydata)[1], dim(ydata)[1]+ vp$pbreaks),ncol=1))
 
     ## p. mode of model with "flat prior"
-    vnp = rfvar3(ydata = rbind(ydata),
-        lags = lags,
-        xdata = rbind(xdata),
-        lambda = NULL, mu = NULL, ic = NULL, const = FALSE)
+    vnp <- rfvar3(ydata = rbind(ydata),
+                  lags = lags,
+                  xdata = rbind(xdata),
+                  lambda = NULL, mu = NULL, ic = NULL, const = FALSE)
 
     ## p. mode of model with only unit root prior
-    vp2 = rfvar3(ydata = rbind(ydata),
-                 lags = lags,
-                 xdata = rbind(xdata),
-                 lambda = 5, mu = 1, ic = NULL, const = FALSE)
+    vp2 <- rfvar3(ydata = rbind(ydata),
+                  lags = lags,
+                  xdata = rbind(xdata),
+                  lambda = 5, mu = 1, ic = NULL, const = FALSE)
 
 
     ## impulse responses
-    irmn = impulsdtrf(vout = var, nstep = nstep) ## standard model
-    irout = impulsdtrf(vout = vp2, nstep = nstep) ## with just unit root prior
-    irnp = impulsdtrf(vout = vnp, nstep = nstep) ## no prior IR
-    
+    irmn <- impulsdtrf(vout = var, nstep = nstep) ## standard model
+    irout <- impulsdtrf(vout = vp2, nstep = nstep) ## with just unit root prior
+    irnp <- impulsdtrf(vout = vnp, nstep = nstep) ## no prior IR
+
 
     ## marginal likelihood (code is copied from a different program)
-    Tu = dim(var$u)[1]
-    Tup = dim(varp$u)[1]
-    flat = FALSE
-    w = matrictint(crossprod(var$u),var$xxi,Tu-flat*(nv+1))-flat*.5*nv*(nv+1)*log(2*pi);
-    wp = matrictint(crossprod(varp$u),varp$xxi,Tup-flat*(nv+1)/2)-flat*.5*nv*(nv+1)*log(2*pi)
+    Tu <- dim(var$u)[1]
+    Tup <- dim(varp$u)[1]
+    flat <- FALSE
+    w <- matrictint(crossprod(var$u),var$xxi,Tu-flat*(nv+1))-flat*.5*nv*(nv+1)*log(2*pi);
+    wp <- matrictint(crossprod(varp$u),varp$xxi,Tup-flat*(nv+1)/2)-flat*.5*nv*(nv+1)*log(2*pi)
     w=w-wp
-    
+
     return(list(w = w, vp2 = vp2, var = var, varp = varp, vnp = vnp, irmn = irmn,
                 irout = irnp, irp = irout, vnames = vnames))
-}
+  }
 
 
 
-scaleplots <- function(ir1, ir2,
-                       ird1 = NULL,
-                       ird2 = NULL,
-                       shockscale = rep(0,10),
-                       filename = 'impulse_plot', format = 'pdf',
-                       shockvars = NULL, responsevars = NULL,
-                       varnames = rep('',dim(ir)[1]),
-                       color1 = c(0, 0, 1), gr = 0.7,
-                       color2 = c(1,0,0),
-                       width = 5, height = 8,
-                       conf = .68, nSteps = 60,
-                       ymat = NULL,
-                       logseries = rep(0,10),
-                       shocknames = NULL,
-                       addtitle = FALSE)
-{
+scaleplots <-
+  function(ir1, ir2,
+           ird1 = NULL,
+           ird2 = NULL,
+           shockscale = rep(0,10),
+           filename = 'impulse_plot', format = 'pdf',
+           shockvars = NULL, responsevars = NULL,
+           varnames = rep('',dim(ir)[1]),
+           color1 = c(0, 0, 1), gr = 0.7,
+           color2 = c(1,0,0),
+           width = 5, height = 8,
+           conf = .68, nSteps = 60,
+           ymat = NULL,
+           logseries = rep(0,10),
+           shocknames = NULL,
+           addtitle = FALSE)
+  {
 
     ## Plots all shocks/responses for an SVAR
-    
+
     ## Code is specific to one (not very general) organization of input -- key things to preserve in a more
     ## general edit would preserve how the plots look and change how the data is processed
-    
+
     ## Karthik Sastry
     ## R 3.0.2, 64 Bit
     ## First edit, June 2014
 
 
     ## END Preamble
-    ######################################################################################################################################################################
 
     require(grDevices)
-    
-    #### filename = paste('/home/karthik/R/summer/macrofin/plotting','/plots/', filename,sep='')
-    
-    filename = paste('plots/', filename,sep='')
-    if (format == 'pdf'){
-        filename = paste(filename, '.pdf', sep = '')
-        pdf(filename, width = width, height = height)
-        color1 = rgb(color1[1], color1[2], color1[3], 1)
-        color2 = rgb(color2[1], color2[2], color2[3], 1)
-    } else if (format == 'eps'){
-        filename = paste(filename, '.eps', sep = '')
-        trellis.device(device="postscript", color = TRUE)
-        ##setEPS()
-        postscript(filename, width = width, height = height)
 
-        ## Cannot do transparent colors, so here is a crude workaround
-        alphafy = function(col,alpha=1) {
-              rr = 1-alpha*(1-c(col/255))
-              return(rgb(rr[1],rr[2],rr[3]))
-        }
-        color = alphafy(color, alpha)
-        
+    #### filename <- paste('/home/karthik/R/summer/macrofin/plotting','/plots/', filename,sep='')
+
+    filename <- paste('plots/', filename,sep='')
+    if (format == 'pdf'){
+      filename <- paste(filename, '.pdf', sep = '')
+      pdf(filename, width = width, height = height)
+      color1 <- rgb(color1[1], color1[2], color1[3], 1)
+      color2 <- rgb(color2[1], color2[2], color2[3], 1)
+    } else if (format == 'eps'){
+      filename <- paste(filename, '.eps', sep = '')
+      trellis.device(device="postscript", color = TRUE)
+      ##setEPS()
+      postscript(filename, width = width, height = height)
+
+      ## Cannot do transparent colors, so here is a crude workaround
+      alphafy <- function(col,alpha=1) {
+        rr <- 1-alpha*(1-c(col/255))
+        return(rgb(rr[1],rr[2],rr[3]))
+      }
+      color <- alphafy(color, alpha)
+
     } ##else raise some kind of error?
 
 
-    ######
-    ## Determining format of output
-    ######
+    ## Determining format of output ----
 
     ## Defaults to all structural shocks, all responses
-    nVar = dim(ir)[1]
+    nVar <- dim(ir)[1]
 
-    if (is.null(shockvars)) shockvars = 1:nVar
-    if (is.null(responsevars)) responsevars = 1:nVar
+    if (is.null(shockvars)) shockvars <- 1:nVar
+    if (is.null(responsevars)) responsevars <- 1:nVar
 
-    nShockvars = length(shockvars)
-    nRespvars = length(responsevars)
+    nShockvars <- length(shockvars)
+    nRespvars <- length(responsevars)
 
     if (is.null(varnames)){
-        varnames = rownames(ir)
+      varnames <- rownames(ir)
     }
 
-    gRange = 1:(nSteps) ##graph range
+    gRange <- 1:(nSteps) ##graph range
     ##In a model sense, you are only going to nSteps - 1 periods (index 1 is really period 0)
 
     ## Converting probability "range" into quantiles
-    probs = c(rev((1 - conf) / 2), .5 + conf/2)
+    probs <- c(rev((1 - conf) / 2), .5 + conf/2)
 
 
     ## Scale every shock correctly
     for (ishock in shockvars){
-        sval = ir1[shockscale[ishock],
-            ishock,1]
+      sval <- ir1[shockscale[ishock],
+                  ishock,1]
 
-        ir2[,ishock,] = ir2[,ishock,] * sval / ir2[shockscale[ishock],ishock,1]
-        ird1[,ishock,,] = ird1[,ishock,,] * sval / rep(
-                ird1[shockscale[ishock],ishock,1,], each = length(ird1[,ishock,,1]))
+      ir2[,ishock,] <- ir2[,ishock,] * sval / ir2[shockscale[ishock],ishock,1]
+      ird1[,ishock,,] <- ird1[,ishock,,] * sval / rep(
+        ird1[shockscale[ishock],ishock,1,], each = length(ird1[,ishock,,1]))
 
-        ird2[,ishock,,] = ird2[,ishock,,] * sval / rep(
-                ird2[shockscale[ishock],ishock,1,], each = length(ird2[,ishock,,1]))
+      ird2[,ishock,,] <- ird2[,ishock,,] * sval / rep(
+        ird2[shockscale[ishock],ishock,1,], each = length(ird2[,ishock,,1]))
     }
-    
 
 
-    ######
-    ## Plot arrangement
-    ######
 
-    arr = c(nRespvars, nShockvars)
+    ## Plot arrangement ----
+
+    arr <- c(nRespvars, nShockvars)
 
     ## par(mfrow = arr,col.lab="black",col.main="black",
     ##     oma=c(1,3,1,2), mar=c(.5,.25,.5,.25), tcl=-0.1, mgp=c(0,0,0))
@@ -3049,265 +3023,261 @@ scaleplots <- function(ir1, ir2,
         oma=c(1,5,1,2), mar=c(.5,.25,.5,.25), tcl=-0.1, mgp=c(3,1,0))
 
     for (irsvar in responsevars) {
-        
-        irsseries_1 = ir1[irsvar,,]
-        irstrials_1 = ird1[irsvar,,,]
 
-        irsseries_2 = ir2[irsvar,,]
-        irstrials_2 = ird2[irsvar,,,]
+      irsseries_1 <- ir1[irsvar,,]
+      irstrials_1 <- ird1[irsvar,,,]
+
+      irsseries_2 <- ir2[irsvar,,]
+      irstrials_2 <- ird2[irsvar,,,]
 
 
-        ## Getting error bands, if appropriate
-        if (!is.null(irstrials_1) & length(irstrials_1> 0)){
-            irsbounds_1 = array(NA, c(nSteps, length(probs), 10))
-            for (iShock in shockvars){
-                iShocktrials = irstrials_1[iShock,,]
-                iShockbounds = t(apply(iShocktrials,1,quantile,probs = probs))
-                irsbounds_1[,,iShock] = iShockbounds[1:(nSteps),]
-            }
-
-            irsbounds_2 = array(NA, c(nSteps, length(probs), 10))
-            for (iShock in shockvars){
-                iShocktrials = irstrials_2[iShock,,]
-                iShockbounds = t(apply(iShocktrials,1,quantile,probs = probs))
-                irsbounds_2[,,iShock] = iShockbounds[1:(nSteps),]
-            }
-
-        } else {
-            irsbounds = NULL
+      ## Getting error bands, if appropriate
+      if (!is.null(irstrials_1) & length(irstrials_1> 0)){
+        irsbounds_1 <- array(NA, c(nSteps, length(probs), 10))
+        for (iShock in shockvars){
+          iShocktrials <- irstrials_1[iShock,,]
+          iShockbounds <- t(apply(iShocktrials,1,quantile,probs = probs))
+          irsbounds_1[,,iShock] <- iShockbounds[1:(nSteps),]
         }
 
-        ##Determining plot scaling/ axis size
-        ##A few different reasonable approaches...
-
-        ##yMax = max(irsseries, irsbounds, 0) ##+ .1e-5 * abs(max(irsseries, irsbounds))
-        ##yMin =  min(irsseries, irsbounds, 0) ##- 1e-5 * abs(min(irsseries, irsbounds))
-
-        if (is.null(ymat)){
-            yMax = max(irsseries_1[shockvars,], irsbounds_1[1:nSteps,,shockvars], irsseries_2[shockvars,], irsbounds_2[1:nSteps,,shockvars], 0) ##+ .1e-5 * abs(max(irsseries, irsbounds))
-            yMin = min(irsseries_1[shockvars,], irsbounds_1[1:nSteps,,shockvars], irsseries_2[shockvars,], irsbounds_2[1:nSteps,,shockvars], 0) ##+ .1e-5 * abs(max(irsseries, irsbounds))
-        } else {
-            yMin = ymat[1,irsvar]
-            yMax = ymat[2,irsvar]
+        irsbounds_2 <- array(NA, c(nSteps, length(probs), 10))
+        for (iShock in shockvars){
+          iShocktrials <- irstrials_2[iShock,,]
+          iShockbounds <- t(apply(iShocktrials,1,quantile,probs = probs))
+          irsbounds_2[,,iShock] <- iShockbounds[1:(nSteps),]
         }
-        
 
-        for (iShockvar in shockvars){
+      } else {
+        irsbounds <- NULL
+      }
 
-            ##Plotting each series
+      ##Determining plot scaling/ axis size
+      ##A few different reasonable approaches...
 
-            plottitle = paste(varnames[irsvar], ' (log)'[logseries[irsvar]],
-                sep = '')
+      ##yMax <- max(irsseries, irsbounds, 0) ##+ .1e-5 * abs(max(irsseries, irsbounds))
+      ##yMin <- min(irsseries, irsbounds, 0) ##- 1e-5 * abs(min(irsseries, irsbounds))
 
-            ## if (length(probs) > 2){ #### 2 sets
-            ##     upper = irsbounds[,4,iShockvar]
-            ##     lower = irsbounds[,1,iShockvar]
-
-            ##     p84 = irsbounds[,3,iShockvar]
-            ##     p16 = irsbounds[,2,iShockvar]
-
-            ## } else {
-            upper1 = irsbounds_1[,3,iShockvar]
-            lower1 = irsbounds_1[,2,iShockvar]
-
-            upper2 = irsbounds_2[,3,iShockvar]
-            lower2 = irsbounds_2[,2,iShockvar]
-
-                ## p16 = NULL
-                ## p84 = NULL
-            ## }
+      if (is.null(ymat)){
+        yMax <- max(irsseries_1[shockvars,], irsbounds_1[1:nSteps,,shockvars], irsseries_2[shockvars,], irsbounds_2[1:nSteps,,shockvars], 0) ##+ .1e-5 * abs(max(irsseries, irsbounds))
+        yMin <- min(irsseries_1[shockvars,], irsbounds_1[1:nSteps,,shockvars], irsseries_2[shockvars,], irsbounds_2[1:nSteps,,shockvars], 0) ##+ .1e-5 * abs(max(irsseries, irsbounds))
+      } else {
+        yMin <- ymat[1,irsvar]
+        yMax <- ymat[2,irsvar]
+      }
 
 
-            plot(irsseries_1[iShockvar, 1:nSteps], ylim = c(yMin, yMax), type = 'l', lwd = 1,
-                 xlab = '', ylab = '', yaxt = 'n', xaxt = 'n',
-                 ## fg = gray(gr),
-                 xlim = c(1,nSteps),
-                 xaxs = 'i',
-                 col = color1)
-            lines(irsseries_2[iShockvar, 1:nSteps], lwd = 1, col = color2)
-            
-            abline(a = 0, b = 0, lwd = 0.75)
+      for (iShockvar in shockvars){
 
-            lines(upper1, lwd = 1, col = color1, lty = 2)
-            lines(lower1, lwd = 1, col = color1, lty = 2)
+        ##Plotting each series
 
-            lines(upper2, lwd = 1, col = color2, lty = 2)
-            lines(lower2, lwd = 1, col = color2, lty = 2)
+        plottitle <- paste(varnames[irsvar], ' (log)'[logseries[irsvar]],
+                           sep = '')
+
+        ## if (length(probs) > 2){ #### 2 sets
+        ##     upper <- irsbounds[,4,iShockvar]
+        ##     lower <- irsbounds[,1,iShockvar]
+
+        ##     p84 <- irsbounds[,3,iShockvar]
+        ##     p16 <- irsbounds[,2,iShockvar]
+
+        ## } else {
+        upper1 <- irsbounds_1[,3,iShockvar]
+        lower1 <- irsbounds_1[,2,iShockvar]
+
+        upper2 <- irsbounds_2[,3,iShockvar]
+        lower2 <- irsbounds_2[,2,iShockvar]
+
+        ## p16 <- NULL
+        ## p84 <- NULL
+        ## }
 
 
-            ##Adding variable name and axis on leftmost plot
-            if (which(shockvars == iShockvar, arr.ind = TRUE) == 1) {
-                ## mtext(plottitle, side = 2, line = 2, cex = .5)
-                mtext(plottitle, side = 2, line = 5, cex = 0.5, las = 1, adj = 0)
-                axis(side = 2, cex.axis = .75, las = 1)
-            }
-            ##Right side axis labels on right most plot
-            ## if (which(shockvars == iShockvar, arr.ind = TRUE) == nShockvars) {
-            ##     axis(side = 4, cex.axis = .5, fg = gray(gr))
-            ## }
+        plot(irsseries_1[iShockvar, 1:nSteps], ylim = c(yMin, yMax), type = 'l', lwd = 1,
+             xlab = '', ylab = '', yaxt = 'n', xaxt = 'n',
+             ## fg = gray(gr),
+             xlim = c(1,nSteps),
+             xaxs = 'i',
+             col = color1)
+        lines(irsseries_2[iShockvar, 1:nSteps], lwd = 1, col = color2)
 
-            ##Shock name if appropriate
-            if (!is.null(shocknames) && (which(responsevars == irsvar, arr.ind = TRUE) == 1)) {
-                mtext(shocknames[iShockvar], side = 3, line = 0, cex = .5)
-            }
+        abline(a = 0, b = 0, lwd = 0.75)
+
+        lines(upper1, lwd = 1, col = color1, lty = 2)
+        lines(lower1, lwd = 1, col = color1, lty = 2)
+
+        lines(upper2, lwd = 1, col = color2, lty = 2)
+        lines(lower2, lwd = 1, col = color2, lty = 2)
+
+
+        ##Adding variable name and axis on leftmost plot
+        if (which(shockvars == iShockvar, arr.ind = TRUE) == 1) {
+          ## mtext(plottitle, side = 2, line = 2, cex = .5)
+          mtext(plottitle, side = 2, line = 5, cex = 0.5, las = 1, adj = 0)
+          axis(side = 2, cex.axis = .75, las = 1)
         }
+        ##Right side axis labels on right most plot
+        ## if (which(shockvars == iShockvar, arr.ind = TRUE) == nShockvars) {
+        ##     axis(side = 4, cex.axis = .5, fg = gray(gr))
+        ## }
+
+        ##Shock name if appropriate
+        if (!is.null(shocknames) && (which(responsevars == irsvar, arr.ind = TRUE) == 1)) {
+          mtext(shocknames[iShockvar], side = 3, line = 0, cex = .5)
+        }
+      }
     }
 
-    ######
-    ## Titles
-    ######
+    ## Titles ----
 
     if (addtitle){
-        bigtitle = paste(type, 'over', as.character(nSteps), 'periods', sep = ' ')
-        title(bigtitle, outer = TRUE, cex = 1.2)
+      bigtitle <- paste(type, 'over', as.character(nSteps), 'periods', sep = ' ')
+      title(bigtitle, outer = TRUE, cex = 1.2)
     }
-    
+
     dev.off()
     ##dev.copy2pdf(file = filename)
-}
+  }
 
 
-sim_model = function(tvvout, ## output of optimization
-    lambda = matrix(1,nv,6), ## - log variances
-    lmdp = rep(10,6), ## number of periods in each regime
-    burn = 0, ## number of periods in the first regime to run as "burn in"
-    y0 = c(rep(0,nv*nlag),1), ## initial state
-    delta = NULL ## variance modifiers
-                     ) {
+sim_model <-
+  function(tvvout, ## output of optimization
+           lambda <- matrix(1,nv,6), ## - log variances
+           lmdp <- rep(10,6), ## number of periods in each regime
+           burn <- 0, ## number of periods in the first regime to run as "burn in"
+           y0 <- c(rep(0,nv*nlag),1), ## initial state
+           delta <- NULL ## variance modifiers
+  ) {
 
     ## Generates fake data from our SVAR model
 
     ## NOTE: if delta is a scalar, the model assumes you wanted t distribution with
     ## 2*delta df, and simulates delta_it as appropriate inverse gamma
 
-    ## ----------------------------------------
 
-    
-    ##
-    ## Get coefficients
-    ##
-    
-    A = tvvout$A ## A0 matrix
-    Ai = solve(A)
 
-    vout = tvvout$vout
+    ## Get coefficients ----
 
-    Ap = vout$var$By ## structural form coefficients A+
-    nv = dim(Ap)[1]
-    nlag = dim(Ap)[3]
-    C = matrix(vout$var$Bx,nv,1) ## constant
+    A <- tvvout$A ## A0 matrix
+    Ai <- solve(A)
+
+    vout <- tvvout$vout
+
+    Ap <- vout$var$By ## structural form coefficients A+
+    nv <- dim(Ap)[1]
+    nlag <- dim(Ap)[3]
+    C <- matrix(vout$var$Bx,nv,1) ## constant
 
     ##
     ## Generate a system matrix
     ##
 
-    By = Ap ## reduced form coefs
+    By <- Ap ## reduced form coefs
     for (ilag in 1:nlag){
-        By[,,ilag] = Ai %*% Ap[,,ilag]
+      By[,,ilag] <- Ai %*% Ap[,,ilag]
     }
 
-    rsys = sysmat(By,Ai %*% C) ## system for the reduced form
+    rsys <- sysmat(By,Ai %*% C) ## system for the reduced form
     ##
     ## Define a (sub) function that moves the system n steps forward
     ##
 
-    moven = function(x0,sysmat,n,nv,nlag,lambda,Ai){
-        ## noise = exp(-lambda) * matrix(rnorm(n * nv),nv,n)
-         noise = Ai %*% (sqrt(lambda) * matrix(rnorm(n * nv),nv,n))
-        xout = matrix(0,nv,n) ## put draws in here
-        for (ii in 1:n){
-            x0 = sysmat %*% x0 + c(noise[,ii],rep(0,1 + (nlag - 1)*nv))
-            xout[,ii] = x0[1:nv]
-        }
-        return(list(xout = xout, xf = x0, shocks = noise))
+    moven <- function(x0,sysmat,n,nv,nlag,lambda,Ai){
+      ## noise <- exp(-lambda) * matrix(rnorm(n * nv),nv,n)
+      noise <- Ai %*% (sqrt(lambda) * matrix(rnorm(n * nv),nv,n))
+      xout <- matrix(0,nv,n) ## put draws in here
+      for (ii in 1:n){
+        x0 <- sysmat %*% x0 + c(noise[,ii],rep(0,1 + (nlag - 1)*nv))
+        xout[,ii] <- x0[1:nv]
+      }
+      return(list(xout = xout, xf = x0, shocks = noise))
     }
 
     ## translate the data into a vector, if necessary
     if (length(dim(y0)) > 1){
-        ## assume the format is like
-        ##       v1  v2 ....
-        ## t = 1
-        ## t = 2
-        ## ...
+      ## assume the format is like
+      ##       v1  v2 ....
+      ## t <- 1
+      ## t <- 2
+      ## ...
 
-        y0 = c(t(y0[nlag:1,]),1)
+      y0 <- c(t(y0[nlag:1,]),1)
     }
-    
+
     ##
     ## Burn in, if desired
     ##
 
     if (burn > 0){
-        lambda_burn = matrix(lambda[,1],dim(lamda)[1],burn) ## repeat period 1 variances
-        burn_in = moven(y0,rsys,burn,nv,nlag,lambda_burn,Ai)
-        y0 = burn_in$xf
+      lambda_burn <- matrix(lambda[,1],dim(lamda)[1],burn) ## repeat period 1 variances
+      burn_in <- moven(y0,rsys,burn,nv,nlag,lambda_burn,Ai)
+      y0 <- burn_in$xf
     } else {
-        burn_in = NULL
+      burn_in <- NULL
     }
     ##
     ## Run the main simulation
     ##
 
-    replambda = lambda[,rep(1:dim(lambda)[2],times = lmdp)]
+    replambda <- lambda[,rep(1:dim(lambda)[2],times = lmdp)]
     ## edit: drop the first 10 obs
-    replambda = replambda
-    
+    replambda <- replambda
+
     if (!is.null(delta)){ ## t case
-        if (length(delta) > 1) { ## multiply by t adjusters
-            replambda = replambda * t(exp(delta)) ## log variancs
-        } else { ## unconditional simulation
-            gd = 1 / rgamma(n = length(replambda), shape = delta, rate = delta)
-            replambda = replambda * gd
-        }
+      if (length(delta) > 1) { ## multiply by t adjusters
+        replambda <- replambda * t(exp(delta)) ## log variancs
+      } else { ## unconditional simulation
+        gd <- 1 / rgamma(n = length(replambda), shape = delta, rate = delta)
+        replambda <- replambda * gd
+      }
     }
-    
-    sim_out = moven(y0, rsys, dim(replambda)[2],
-                    nv, nlag,
-                    replambda,Ai)
+
+    sim_out <- moven(y0, rsys, dim(replambda)[2],
+                     nv, nlag,
+                     replambda,Ai)
 
     ##
     ## get reduced form
     ##
-    ## rfsim = t(Ai %*% sim_out$xout)
+    ## rfsim <- t(Ai %*% sim_out$xout)
 
     return(list(sim_out = sim_out,
                 sshocks = sim_out$shocks,
                 burn_in = burn_in))
-}                     
+  }
 
 
-SVARhtskdmdd <- function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, breaks=NULL,
-                         urprior=list(lambda=5,mu=1), mnprior=list(tight=3,decay=.5),
-                         vprior=list(sig=NULL,w=1), train=0,flat=FALSE,nonorm=FALSE,ic=NULL,
-                         mnstart = 1, cores = 1, cosprior = NULL,
-                         lmdmean = FALSE, oweights = NULL,
-                         drawbe = FALSE)
-### This gives the posterior integrated over A+ (the right-hand side coefficients), conditional
-### on A0 and lmd.
-###---------------------------------------------
-### ydata:        endogenous variable data matrix, including initial condition dates.
-### xdata:        exogenous variable data matrix, including initial condition dates.  
-### const:        Constant term is added automatically if const=TRUE.
-### A0:           Contemporaneous coefficient matrix --- constant.
-### lmd:          Column Vectors of log variances of structural shocks.
-### Tsigbrk:      Dates at which lmd vectors change.  Last date with old lmd (not first with new).
-### breaks:       breaks in the data.  The first lags data points after a break are used
-###               as new initial conditions, not data points for the fit.
-### lambda:       weight on the co-persistence prior dummy observation.  (5 is reasonable)
+SVARhtskdmdd <-
+  function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, breaks=NULL,
+           urprior=list(lambda=5,mu=1), mnprior=list(tight=3,decay=.5),
+           vprior=list(sig=NULL,w=1), train=0,flat=FALSE,nonorm=FALSE,ic=NULL,
+           mnstart = 1, cores = 1, cosprior = NULL,
+           lmdmean = FALSE, oweights = NULL,
+           drawbe = FALSE)
+    ### This gives the posterior integrated over A+ (the right-hand side coefficients), conditional
+    ### on A0 and lmd.
+    # ydata:        endogenous variable data matrix, including initial condition dates.
+    ### xdata:        exogenous variable data matrix, including initial condition dates.
+    ### const:        Constant term is added automatically if const=TRUE.
+    ### A0:           Contemporaneous coefficient matrix --- constant.
+    ### lmd:          Column Vectors of log variances of structural shocks.
+    ### Tsigbrk:      Dates at which lmd vectors change.  Last date with old lmd (not first with new).
+    ### breaks:       breaks in the data.  The first lags data points after a break are used
+    ###               as new initial conditions, not data points for the fit.
+    ### lambda:       weight on the co-persistence prior dummy observation.  (5 is reasonable)
 ###               lambda>0 => x variables included; lambda<0 => x variables excluded;
 ### mnprior       see vprior() comments
-### urprior:      
+### urprior:
 ### train:        If non-zero, this is the point in the sample at which the
 ###               "training sample" ends.  Prior x likelihood to this point is weighted to
 ###               integrate to 1, and therefore is treated as if it were itself the prior.
 ###               To do a pure training sample prior, set lambda=mu=0, mnprior=NULL, vprior$w=0,
-###               train>lags.  
+###               train>lags.
 ### flat:         Even with lambda=mu=vprior$w=0, mnprior=NULL, det(Sigma)^(-(nv+1)/2) is used
 ###               as a "prior", unless flat=TRUE. flat=TRUE is likely not to work unless train is reasonably large.
 ### nonorm:       If true, use dummy observations but do not normalize posterior to make them a
 ###               proper prior.  Useful to duplicate results obtained by others, to use
 ###               dummy observations that do not imply a proper prior, or to save computing time in case only the
-###               posterior on this model's parameters, not the weight on the model, is needed.  
+###               posterior on this model's parameters, not the weight on the model, is needed.
 ### ic:           Initial conditions matrix for use in forming the sums of coefficients dummy observations.
 ###               If ic=NULL, the means of the first lags observations in ydata are used.  If !is.null(ic),
 ###               ic should be a single "observation" on the y's and x's that will be used as the persistent
@@ -3316,13 +3286,13 @@ SVARhtskdmdd <- function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, br
 ###               Note that to enter a prior directly as dummy observations, one can treat the
 ###               Dummy observations as a training sample.
 ###
-{
+  {
     if (is.null(dim(ydata)))  ydata <- matrix(ydata, ncol=1)
     ybar <- apply(ydata[1:lags, ], 2, mean)
     T <- dim(ydata)[1]
     nv <- dim(ydata)[2]
     if (const) {
-        xdata <- cbind(xdata, matrix(1,T,1))
+      xdata <- cbind(xdata, matrix(1,T,1))
     }
     ## looks likely that const=FALSE, xdata=NULL case crashes.  (2012.9.24)
     if (!is.null(xdata) ) stopifnot( dim(xdata)[1] == T)
@@ -3332,42 +3302,41 @@ SVARhtskdmdd <- function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, br
 
     ## -------- set lmd for prior dummies --------------
     if (is.null(dim(lmd))){
-        lmdbar <- lmd ## only 1 variance regimex
+      lmdbar <- lmd ## only 1 variance regimex
     } else if (lmdmean){
-        lmdbar <- apply(lmd, 1, mean) ## take mean of logs
+      lmdbar <- apply(lmd, 1, mean) ## take mean of logs
     } else { ## zero is the arithmetic mean always
-        lmdbar = rep(0,dim(lmd)[1])
+      lmdbar <- rep(0,dim(lmd)[1])
     }
     lmd <- cbind(lmd, lmdbar)
 
 
     ## -------- set A0 for prior dummies, if required ------
     if (length(dim(A0)) == 3){
-        A0 = abind(A0,apply(A0,1:2,mean),along=3)
+      A0 <- abind(A0,apply(A0,1:2,mean),along=3)
     }
-        
+
     ## --------------------- Tsigbrk assumed to be indexes into ydata matrix, not
     ## --------------------- dates.  Conversion from dates and adding T done in bvarWrap3().
     ## Tsigbrk <- c(invTime(Tsigbrk, ydata), T)            #dummy obs at end
-    
-    ##-------------------------------------------
-    ## var = rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1),
+
+    ## var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1),
     ## const=FALSE, lambda=lambda, mu=mu, ic=ic) # const is FALSE in this call because ones alread put into xdata
 
-    ## var = rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum),
+    ## var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum),
     ##     breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
     ##     mu=NULL, ic=ic, sigpar=list(A0=A0,lmd=lmd,Tsigbrk=Tsigbrk), cores = cores)
 
     ## ISSUE 7/27: lmdbar is not being used for the dummies! because of the way Tsigbrk is coded
-    var = rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum),
-                 breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
-                 mu=NULL, ic=ic, sigpar=list(A0=A0,lmd=lmd,Tsigbrk=c(Tsigbrk,T)), cores = cores,
-                 oweights = oweights, drawbe = drawbe)
+    var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum),
+                  breaks=matrix(c(breaks, T, T + vp$pbreaks), ncol=1), const=FALSE, lambda=NULL,
+                  mu=NULL, ic=ic, sigpar=list(A0=A0,lmd=lmd,Tsigbrk=c(Tsigbrk,T)), cores = cores,
+                  oweights = oweights, drawbe = drawbe)
 
-	if (is.null(var)) {
-		return(list(w = -Inf))
-	}
-	
+    if (is.null(var)) {
+      return(list(w = -Inf))
+    }
+
     ##  const is FALSE in this call because ones alread put into xdata
     Tu <- dim(var$u)[1]
     if ( any(var$snglty > 0) ) error( var$snglty, " redundant columns in rhs matrix")
@@ -3375,126 +3344,126 @@ SVARhtskdmdd <- function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, br
 
     ## Check if A0 is constant or changing across regimes
     if (length(dim(A0)) == 2){
-        detTerm = determinant(A0)$modulus
+      detTerm <- determinant(A0)$modulus
     } else {
 
-        ## Take determinants for each A0 in the list
-        dets = apply(A0,3,function(x){determinant(x)$modulus})
+      ## Take determinants for each A0 in the list
+      dets <- apply(A0,3,function(x){determinant(x)$modulus})
 
-        ## Weighted sum of determinants
-        detTerm = sum(dets[var$freqs])/length(var$freqs)
-        
+      ## Weighted sum of determinants
+      detTerm <- sum(dets[var$freqs])/length(var$freqs)
+
     }
-    
-    
+
+
     llh <- -.5 * sum(var$u^2) + Tu * (-nv * log(2 * pi)/2 + detTerm) +
-        lmdllh
+      lmdllh
     ## nb: determinant() returns log of abs value of determinant
     nX <- lags * nv + 1
     w <-  llh + .5 * sum(var$logdetxxi) + nv * nX * log(2 * pi)/2
     if(train!=0) {
-        if(train <= lags)
-            {
-                cat("end of training sample <= # of lags\n")  #
-                    return
-            }
-        Tp <- train
-        tbreaks <- c(breaks[breaks<train],Tp)
+      if(train <= lags)
+      {
+        cat("end of training sample <= # of lags\n")  #
+        return
+      }
+      Tp <- train
+      tbreaks <- c(breaks[breaks<train],Tp)
     } else {
-        Tp <- lags
-        ## because need initial conditions to form lambda/mu prior dummy obs
-        tbreaks <- Tp
+      Tp <- lags
+      ## because need initial conditions to form lambda/mu prior dummy obs
+      tbreaks <- Tp
     }
     ytrain <- ydata[1:Tp,,drop=FALSE]
     xtrain <- xdata[1:Tp,,drop=FALSE]
     if (!nonorm) {
-        priorTsigbrk <- c(0, Tp)
-        ## It is assumed that there are no breaks in lmd in the training sample!
-        priornsig <- 2
-        priorlmd <- cbind(lmd[ , 1], lmd[ , dim(lmd)[2]])
+      priorTsigbrk <- c(0, Tp)
+      ## It is assumed that there are no breaks in lmd in the training sample!
+      priornsig <- 2
+      priorlmd <- cbind(lmd[ , 1], lmd[ , dim(lmd)[2]])
 
-        if (length(dim(A0)) == 3){  # in case of time varying A0
-            priorA0 = abind(A0[,,1],A0[,,dim(A0)[3]],along=3)
+      if (length(dim(A0)) == 3){  # in case of time varying A0
+        priorA0 <- abind(A0[,,1],A0[,,dim(A0)[3]],along=3)
+      } else {
+        priorA0 <- A0
+      }
+
+
+
+
+      varp <- rfvar3(ydata=rbind(ytrain, vp$ydum), lags=lags, xdata=rbind(xtrain, vp$xdum),
+                     breaks=c(tbreaks, Tp+vp$pbreaks),
+                     lambda=NULL, mu=NULL, const=FALSE, ic=ic,
+                     sigpar=list(A0=priorA0,lmd=priorlmd, Tsigbrk=priorTsigbrk),
+                     cores = cores)
+      ## const is FALSE here because xdata already has a column of ones.
+
+      ## If regression blew up, return infinite likelihood so optimization knows not to proceed
+      if (is.null(varp)){
+        return(list(w = -Inf))
+      }
+      if (any(varp$snglty > 0)) {
+        warning("Prior improper, short ", varp$snglty, " df.  Results likely nonsense.")
+      } else {
+        Tup <- dim(varp$u)[1]
+        lmdllhp <- .5 * sum(varp$lmdseries)
+
+        if (length(dim(A0)) == 3){  # use the prior A0
+
+          detsp <- dets[c(1,length(dets))] # determinants for right regimes
+
+          ## Weighted sum of determinants
+          detPriorA0 <- sum(detsp[varp$freqs])/length(varp$freqs)
+
         } else {
-            priorA0 = A0
+          detPriorA0 <- determinant(A0)$modulus
         }
-        
-        
 
-        
-        varp <- rfvar3(ydata=rbind(ytrain, vp$ydum), lags=lags, xdata=rbind(xtrain, vp$xdum),
-                       breaks=c(tbreaks, Tp+vp$pbreaks), 
-                       lambda=NULL, mu=NULL, const=FALSE, ic=ic,
-                       sigpar=list(A0=priorA0,lmd=priorlmd, Tsigbrk=priorTsigbrk), 
-					   cores = cores)
-        ## const is FALSE here because xdata already has a column of ones.
-		
-		## If regression blew up, return infinite likelihood so optimization knows not to proceed
-		if (is.null(varp)){
-			return(list(w = -Inf))
-		}
-        if (any(varp$snglty > 0)) {
-            warning("Prior improper, short ", varp$snglty, " df.  Results likely nonsense.")
-        } else {
-            Tup <- dim(varp$u)[1]
-            lmdllhp <- .5 * sum(varp$lmdseries)
+        llhp <- -.5 * sum(varp$u^2) - Tup * (nv * log(2 * pi)/2 - detPriorA0) +
+          lmdllhp
 
-            if (length(dim(A0)) == 3){  # use the prior A0
-                
-                detsp = dets[c(1,length(dets))] # determinants for right regimes
-
-                ## Weighted sum of determinants
-                detPriorA0 = sum(detsp[varp$freqs])/length(varp$freqs)
-                
-            } else {
-                detPriorA0 = determinant(A0)$modulus
-            }
-            
-            llhp <- -.5 * sum(varp$u^2) - Tup * (nv * log(2 * pi)/2 - detPriorA0) +
-                lmdllhp
-                
-            normalizer <- .5 * sum(varp$logdetxxi) + nv * nX * log(2 * pi)/2
-            wp <- llhp + normalizer
-            w <- w-wp
-            llh <- llh - normalizer
-            ## llh is height of posterior density over A0, lmd, A+ at peak.  w is height of
-            ## marginal posterior for A0, lmd, with A+ integrated out.
-        }
+        normalizer <- .5 * sum(varp$logdetxxi) + nv * nX * log(2 * pi)/2
+        wp <- llhp + normalizer
+        w <- w-wp
+        llh <- llh - normalizer
+        ## llh is height of posterior density over A0, lmd, A+ at peak.  w is height of
+        ## marginal posterior for A0, lmd, with A+ integrated out.
+      }
     } else {
-        varp <- NULL
+      varp <- NULL
     }
     return(list(w=w,var=var,varp=varp,prior=list(urprior=urprior, vprior=vprior, mnprior=mnprior)))
-}
+  }
 
 
 #' Priors for time series regression
-#' 
-#'     Creates dummy observations for a prior symmetric in variables, 
+#'
+#'     Creates dummy observations for a prior symmetric in variables,
 #'     favoring persistence.
-#' 
+#'
 #'     The regression right-hand-side is assumed to contain lagged values, possibly
-#'     of both dependent and independent variables.  By default it centers on a 
+#'     of both dependent and independent variables.  By default it centers on a
 #'     random walk with no effects of independent variables. The results can be used
 #'     directly in \code{\link{blm}}
 #'
 #'    @param  vlist Character vector of names of the rhs variables
 #'    @param  dvname Name of dependent variable
-#'    @param  lags How many lags of each variable.  Can be a single integer, 
-#'            if all variables appear with the same number of lags, or a 
-#'            vector of integers, one for each variable. Note that this 
+#'    @param  lags How many lags of each variable.  Can be a single integer,
+#'            if all variables appear with the same number of lags, or a
+#'            vector of integers, one for each variable. Note that this
 #'            program does not care whether, when \code{lags[iv]=3}, this means that
-#'            lags 1 to 3, 0 to 2, or 10 to 12 are included.  
-#'    @param  scale A vector, of the length of \code{vlist} plus 1, of 
-#'            reasonable guesses as to the standard deviations of 
+#'            lags 1 to 3, 0 to 2, or 10 to 12 are included.
+#'    @param  scale A vector, of the length of \code{vlist} plus 1, of
+#'            reasonable guesses as to the standard deviations of
 #'            the variables.  The last element scales the levels dummy that relates the constant to the
 #'            other parameters, which should be 1.0, or smaller if guesses of variable means in vmeans are
 #'            quite uncertain.
-#'   @param   bbar mean of the regression coefficient vector.  Default of 1 
+#'   @param   bbar mean of the regression coefficient vector.  Default of 1
 #'            followed by zeros is reasonable when the first variable is a lagged dependent variable and this
 #'            is a regression with a persistent dependent variable.  Last element
 #'            is prior mean of constant (usually 0).
 #'   @param   smooth The rate at which the scale of dummy observations drops as we go from low to
-#'            high frequencies.  Should usually be in (0,1).  If close to zero, prior on the 
+#'            high frequencies.  Should usually be in (0,1).  If close to zero, prior on the
 #'            variable's effect is stronger at low than at high frequencies.  With smooth=1
 #'            and damp=1, the prior just shrinks all coefficients toward their prior means
 #'            symmetrically and independently.
@@ -3510,7 +3479,7 @@ SVARhtskdmdd <- function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, br
 #'   @return  A list with components:
 #'   \itemize{
 #'     \item y. Dependent variable value for dummy observations.
-#'     \item X. Dummy observations implementing the prior.  
+#'     \item X. Dummy observations implementing the prior.
 #'     \item scalefac. Amount by which the prior has been scaled to match \code{erratio}.
 #'   }
 #'   @details Note that the last column of \code{X} is the
@@ -3522,51 +3491,52 @@ SVARhtskdmdd <- function(ydata,lags,xdata=NULL, const=TRUE, A0, lmd, Tsigbrk, br
 #'            of lags.  This program allows different lag lengths, but always \code{1:lag[iv]}.
 #'  @seealso \code{\link{lagts}} for preparation of a data matrix in a form that is compatible with this
 #'           function.  \code{\link{blm}} to combine the prior with data to obtain estimates.
-tsregPrior <- function(vlist, dvname="y", lags=rep(0, length(vlist)), ldv=1, scale, 
-                       bbar=NULL, smooth, damp, vmeans, erratio) {  
-    nv <- length(vlist)
-    nx <- if (length(lags) > 1) {
-        sum(lags)
-    } else {
-        nv * lags
-    }
-    if (length(lags) == 1) {
-        lags <- rep(lags, nv)
-    }
-    X <- matrix(0, nx + 1, nx + 1)
-    nv <- length(vlist)
-    js <- 0
-    for (iv in 1:nv) {
-        X[js + (1:lags[iv]), js + (1:lags[iv])] <- smooth^(0:(lags[iv]-1)) * ctmat(lags[iv]) %*% diag(damp^(0:(lags[iv]-1))) * scale[iv]
-        js <- js + lags[iv]
-    }
-    X[ ,  nx+1] <- 0
-    vmeans <- c(rep(vmeans, times=lags), 1)
-    X[nx+1, ] <- vmeans * scale[nv + 1]
-    erratio0 <- solve(t(X), vmeans)
-    erratio0 <- sum(erratio0)^2
-    X <- sqrt(erratio0/erratio) * X
-    w <- -.5 * determinant(crossprod(X))$modulus
-    if (is.null(bbar)) bbar <- c(1, rep(0,nx))
-    y <- X %*% bbar
-    y <- matrix(y, ncol=1, dimnames=list(NULL, dvname))
-    dimnames(X)[[2]] <- c(rep(vlist, times=lags), "const")           # no indication of lags in names
-    return(list(y=y, X=X, scalefac=sqrt(erratio0/erratio), call=match.call()))
+tsregPrior <- function(vlist, dvname="y", lags=rep(0, length(vlist)), ldv=1, scale,
+                       bbar=NULL, smooth, damp, vmeans, erratio) {
+  nv <- length(vlist)
+  nx <- if (length(lags) > 1) {
+    sum(lags)
+  } else {
+    nv * lags
+  }
+  if (length(lags) == 1) {
+    lags <- rep(lags, nv)
+  }
+  X <- matrix(0, nx + 1, nx + 1)
+  nv <- length(vlist)
+  js <- 0
+  for (iv in 1:nv) {
+    X[js + (1:lags[iv]), js + (1:lags[iv])] <- smooth^(0:(lags[iv]-1)) * ctmat(lags[iv]) %*% diag(damp^(0:(lags[iv]-1))) * scale[iv]
+    js <- js + lags[iv]
+  }
+  X[ ,  nx+1] <- 0
+  vmeans <- c(rep(vmeans, times=lags), 1)
+  X[nx+1, ] <- vmeans * scale[nv + 1]
+  erratio0 <- solve(t(X), vmeans)
+  erratio0 <- sum(erratio0)^2
+  X <- sqrt(erratio0/erratio) * X
+  w <- -.5 * determinant(crossprod(X))$modulus
+  if (is.null(bbar)) bbar <- c(1, rep(0,nx))
+  y <- X %*% bbar
+  y <- matrix(y, ncol=1, dimnames=list(NULL, dvname))
+  dimnames(X)[[2]] <- c(rep(vlist, times=lags), "const")           # no indication of lags in names
+  return(list(y=y, X=X, scalefac=sqrt(erratio0/erratio), call=match.call()))
 }
 
 
-TvvDir = function(dfData, freq = 'monthly',
-                   vars = c('RPCE','INDPRO','PCEPI','GS10','TB3MS','ffr_r','ebp'),
-                   logseries = c(1,1,1,0,0,0,0), nLags = 10, lcA0 = NULL,
-                   lmdblock = NULL, strTsigbrk = c('SEP1979','DEC1982','DEC1989','DEC2007'),
-                   startdate = NULL, enddate = NULL, timedummy = NULL,
-                   verbose = FALSE, seedmodel = NULL, nStep = 60, extracheck = TRUE,
-                   nGradcores = 1, nVarcores = 1, seedx = NULL, lmdPrior = FALSE, mnstart = 1,
-                   mntight = 3, mndecay = 0.5, vprior = 0, cosprior = NULL,
-                   nlt = NULL,hparam_nl = rep(0,3), hparam = rep(0,7), critval = 1e-10,
-                   seedH = NULL, tvA = FALSE, noLmd = FALSE)
+TvvDir <-
+  function(dfData, freq = 'monthly',
+           vars = c('RPCE','INDPRO','PCEPI','GS10','TB3MS','ffr_r','ebp'),
+           logseries = c(1,1,1,0,0,0,0), nLags = 10, lcA0 = NULL,
+           lmdblock = NULL, strTsigbrk = c('SEP1979','DEC1982','DEC1989','DEC2007'),
+           startdate = NULL, enddate = NULL, timedummy = NULL,
+           verbose = FALSE, seedmodel = NULL, nStep = 60, extracheck = TRUE,
+           nGradcores = 1, nVarcores = 1, seedx = NULL, lmdPrior = FALSE, mnstart = 1,
+           mntight = 3, mndecay = 0.5, vprior = 0, cosprior = NULL,
+           nlt = NULL,hparam_nl = rep(0,3), hparam = rep(0,7), critval = 1e-10,
+           seedH = NULL, tvA = FALSE, noLmd = FALSE)
 
-{
+  {
 
     ## This version uses the Dirichlet prior / different scalings
     ## The posterior density integrated over A+ is calculated in bvarwrap5
@@ -3621,214 +3591,203 @@ TvvDir = function(dfData, freq = 'monthly',
     ## If verbose: the raw output of the optimization routine (in $opt), plus information about the
     ## VAR estimated at the posterior mode. The whole structure is an input for the programs that run MCMC
 
-    ## Karthik Sastry
-    ## R 3.0.2, 64 Bit
-    ## June 2014 and July 2016
-
     ## END PREAMBLE
-######################################################################################
 
-######
-    ## Libraries
-######
+    ## Libraries ----
 
-    # library(parallel)
+    library(parallel)
 
 
-######
-    ## Loading data
-######
+
+    ## Loading data ----
+
 
     ##rawdata = gzimport(freq = freq)
 
-    listData = dataprep(dfData, vars, freq = freq, Tsigbrk = strTsigbrk,
-                        logseries = logseries, startdate = startdate, enddate = enddate,
-                        timedummy = timedummy)
+    listData <- dataprep(dfData, vars, freq = freq, Tsigbrk = strTsigbrk,
+                         logseries = logseries, startdate = startdate, enddate = enddate,
+                         timedummy = timedummy)
 
-    Tsigbrk = listData$Tsigbrk ##from string breaks to numeric breaks
+    Tsigbrk <- listData$Tsigbrk ##from string breaks to numeric breaks
     ##also adding zero at the beginning
 
-##########################################################
-    ## Grabbing prior parameters
+    ## Grabbing prior parameters ----
     ## sticks them all in a list that will be accessed by the program.
     ## the "efficient" thing would be to generate the actual dummy observations now, but
     ## I haven't found that to be the time consuming part of posterior evaluation
-##########################################################
 
-    pparams = pparams(listData, mnstart = mnstart, mntight = mntight, mndecay = mndecay, vprior = vprior, cosprior = cosprior) ##all options are handled in this function
+    pparams <- pparams(listData, mnstart = mnstart, mntight = mntight, mndecay = mndecay, vprior = vprior, cosprior = cosprior) ##all options are handled in this function
 
-##########################################################
-    ## Setting initial parameters for optimization
-##########################################################
+    ## Setting initial parameters for optimization ----
 
     ##Current method: Estimate a full-sample model and use linear projections
     ##to get individual lmd
 
     ##Restrictions on A0, lmd by brute force (seed model has no restrictions)
 
-    nVar = dim(listData$Y)[2]
-    T = dim(listData$Y)[1] - nLags
+    nVar <- dim(listData$Y)[2]
+    T <- dim(listData$Y)[1] - nLags
 
     if (is.null(lcA0)) {
-	lcA0 = matrix(FALSE,nVar,nVar)
-	lcA0[lower.tri(lcA0)] = TRUE ##lower triangular default structure
+      lcA0 <- matrix(FALSE,nVar,nVar)
+      lcA0[lower.tri(lcA0)] <- TRUE ##lower triangular default structure
     }
 
     if (!is.null(seedmodel)){
-	##use a previous output of this routine to seed the model
+      ##use a previous output of this routine to seed the model
 
-	##program will re-apply zero restrictions as appropriate, but number of variables
-##must be correct
-	seedLmd = seedmodel$lambda ## not lmd for this model
-	seedA = seedmodel$A
+      ##program will re-apply zero restrictions as appropriate, but number of variables
+      ##must be correct
+      seedLmd <- seedmodel$lambda ## not lmd for this model
+      seedA <- seedmodel$A
 
-	nRegimes = dim(seedLmd)[2]
+      nRegimes <- dim(seedLmd)[2]
     } else if (is.null(seedx)){
-	##project a reduced form with fixed variances onto the format we want
+      ##project a reduced form with fixed variances onto the format we want
 
-	if (any(hparam_nl > 0)){
-            ## apply the nonlinear transformation
-            mydata = applynl(listData$Y,nlt)$data
-        } else{
-            mydata = listData$Y
-        }
+      if (any(hparam_nl > 0)){
+        ## apply the nonlinear transformation
+        mydata <- applynl(listData$Y,nlt)$data
+      } else{
+        mydata <- listData$Y
+      }
 
-        if ((nLags * dim(mydata)[2]) > (dim(mydata)[1] - nLags)){ ## dimensionality problem
-            nLagsrf = 4 ## crude
-        } else {
-            nLagsrf = nLags
-        }
-        seedrfmodel = rfvar3(ydata = mydata, lags = nLagsrf, lambda = pparams$urprior$lambda,
-                             mu = pparams$urprior$mu)
+      if ((nLags * dim(mydata)[2]) > (dim(mydata)[1] - nLags)){ ## dimensionality problem
+        nLagsrf <- 4 ## crude
+      } else {
+        nLagsrf <- nLags
+      }
+      seedrfmodel <- rfvar3(ydata = mydata, lags = nLagsrf, lambda = pparams$urprior$lambda,
+                            mu = pparams$urprior$mu)
 
 
-        tempAinv = (t(chol(crossprod(seedrfmodel$u) / dim(seedrfmodel$u)[1]))) ##unscaled
+      tempAinv <- (t(chol(crossprod(seedrfmodel$u) / dim(seedrfmodel$u)[1]))) ##unscaled
 
-	u = seedrfmodel$u
-	regimes = c(0, Tsigbrk - nLagsrf, T)
-	nRegimes = length(regimes) - 1
-	seedLmd = matrix(1, nVar, nRegimes)
+      u <- seedrfmodel$u
+      regimes <- c(0, Tsigbrk - nLagsrf, T)
+      nRegimes <- length(regimes) - 1
+      seedLmd <- matrix(1, nVar, nRegimes)
 
-	seedA = solve(tempAinv)
+      seedA <- solve(tempAinv)
 
-	seedA[!lcA0] = 0 ##restrictions
-	seedA[upper.tri(seedA)] = 0 ##avoiding floating point junk; unclear if important
+      seedA[!lcA0] <- 0 ##restrictions
+      seedA[upper.tri(seedA)] <- 0 ##avoiding floating point junk; unclear if important
 
-        seedAinv = solve(seedA)
-	seedAinv[upper.tri(seedAinv)] = 0
+      seedAinv <- solve(seedA)
+      seedAinv[upper.tri(seedAinv)] <- 0
 
-        ## if (nRegimes == 1) { ##one regime, no need for below
-        ## 	seedLmd = fullLmd
-        ## } else{
-        ## 	for (iRegime in (1:nRegimes)) {
-        ## 		iRange = (regimes[iRegime] + 1) : (regimes[iRegime + 1])
-        ## 		##Tsigbrk indicates new regime starts at next time
-        ## 		iU = u[iRange,]
-        ## 		iOmega = crossprod(iU) / dim(iU)[1] ##reduced form variances
-        ## 		iLambda = seedAinv %*% iOmega %*% t(seedAinv) ##structural variances, in a sense
-        ## 		##Just taking diagonal elements
-        ## 		seedLmd[,iRegime] = -log(diag(iLambda))
-        ## 	}
-        ## }
+      ## if (nRegimes == 1) { ##one regime, no need for below
+      ## 	seedLmd <- fullLmd
+      ## } else{
+      ## 	for (iRegime in (1:nRegimes)) {
+      ## 		iRange <- (regimes[iRegime] + 1) : (regimes[iRegime + 1])
+      ## 		##Tsigbrk indicates new regime starts at next time
+      ## 		iU <- u[iRange,]
+      ## 		iOmega <- crossprod(iU) / dim(iU)[1] ##reduced form variances
+      ## 		iLambda <- seedAinv %*% iOmega %*% t(seedAinv) ##structural variances, in a sense
+      ## 		##Just taking diagonal elements
+      ## 		seedLmd[,iRegime] <- -log(diag(iLambda))
+      ## 	}
+      ## }
 
-        ## fullLmd = kronecker(matrix(fullLmd,nrow = length(fullLmd)),t(rep(1,nRegimes)))
+      ## fullLmd <- kronecker(matrix(fullLmd,nrow = length(fullLmd)),t(rep(1,nRegimes)))
     }
 
-    nRegimes = length(strTsigbrk) + 1
-    lcLmd = matrix(TRUE, nVar, nRegimes)
-    lcLmd[,nRegimes] = FALSE
+    nRegimes <- length(strTsigbrk) + 1
+    lcLmd <- matrix(TRUE, nVar, nRegimes)
+    lcLmd[,nRegimes] <- FALSE
     ##like lcA0, tells program what values to fill from x
 
     if (!is.null(lmdblock)){
-	##generate matrix that tells optimizer what to fill in lmd
-	nBlocks = dim(lmdblock)[3]
-	for (iBlock in 1:nBlocks){
-            ##could not get logical indexing to work here at all, so I'm doing an awkward loop
-            reps = which(lmdblock[,,iBlock])
-            nReps = length(reps)
+      ##generate matrix that tells optimizer what to fill in lmd
+      nBlocks <- dim(lmdblock)[3]
+      for (iBlock in 1:nBlocks){
+        ##could not get logical indexing to work here at all, so I'm doing an awkward loop
+        reps <- which(lmdblock[,,iBlock])
+        nReps <- length(reps)
 
-            for (iRep in 2:nReps) {
-                lcLmd[reps[iRep]] = FALSE
-            }
-            ##(lcLmd[which(lmdblock[,,iBlock])[-1]]) =
-            ##rep(FALSE, length(which(lmdblock[,,iBlock])) - 1) ##fill in first of the block
+        for (iRep in 2:nReps) {
+          lcLmd[reps[iRep]] <- FALSE
+        }
+        ##(lcLmd[which(lmdblock[,,iBlock])[-1]]) =
+        ##rep(FALSE, length(which(lmdblock[,,iBlock])) - 1) ##fill in first of the block
 
-            if (is.null(seedmodel)){
-                ## seedLmd[lmdblock[,,iBlock]] = fullLmd[lmdblock[,,iBlock]] ##seed with full sample lmd estimates
-                seedLmd[lmdblock[,,iBlock]] = 1 ##seed with full sample lmd estimates
-            }
-	}
+        if (is.null(seedmodel)){
+          ## seedLmd[lmdblock[,,iBlock]] <- fullLmd[lmdblock[,,iBlock]] ##seed with full sample lmd estimates
+          seedLmd[lmdblock[,,iBlock]] <- 1 ##seed with full sample lmd estimates
+        }
+      }
     }
 
     ## If number of lambda parameters = number of variables, don't include any lambda parameters
     ## ie variances are constant
     if (sum(lcLmd) <= nVar){
-        lcLmd[,] = FALSE
+      lcLmd[,] <- FALSE
     }
 
 
     ##construct an x vector, if one not already provided
     if (is.null(seedx)){
-        if (tvA == FALSE){              #A0 is constant
-            seedx = c(c(seedA[lcA0]), c(seedLmd[lcLmd]))
+      if (tvA == FALSE){              #A0 is constant
+        seedx <- c(c(seedA[lcA0]), c(seedLmd[lcLmd]))
+      } else {
+        if (noLmd == TRUE){
+          ## Estimate without a prior on lmd --- set constant to 1
+          seedx <- c(rep(c(seedA[lcA0]),times=nRegimes))
         } else {
-            if (noLmd == TRUE){
-                ## Estimate without a prior on lmd --- set constant to 1
-                seedx = c(rep(c(seedA[lcA0]),times=nRegimes))
-            } else {
-                ## Estimate with the prior on lmd
-                seedx = c(rep(c(seedA[lcA0]),times=nRegimes),c(seedLmd[lcLmd]))
-            }
-
+          ## Estimate with the prior on lmd
+          seedx <- c(rep(c(seedA[lcA0]),times=nRegimes),c(seedLmd[lcLmd]))
         }
+
+      }
     }
 
 
     if (any(hparam_nl > 0)){
-        ## add params for nl transformation if desired
-        if (length(seedx) == (sum(lcA0) + sum(lcLmd))){
-            ## add new params
-            sval = c(.3,.4,1,
-                     3,2)
-            ## some guesses for a,c,beta,iv,k
-            seedx = c(seedx, sval[hparam_nl > 0])
+      ## add params for nl transformation if desired
+      if (length(seedx) == (sum(lcA0) + sum(lcLmd))){
+        ## add new params
+        sval <- c(.3,.4,1,
+                  3,2)
+        ## some guesses for a,c,beta,iv,k
+        seedx <- c(seedx, sval[hparam_nl > 0])
 
-            ## nAparams = sum(lcA0)
-            ## Nlmdparams = sum(lcLmd)
-            ## seedH = diag(c(rep(1, nAparams),
-            ##                .1 * c(seedLmd[lcLmd]),
-            ##                rep(.001,sum(hparam_nl > 0)),
-            ##                rep(1e-2, sum(hparam > 0))))
-        }
+        ## nAparams <- sum(lcA0)
+        ## Nlmdparams <- sum(lcLmd)
+        ## seedH <- diag(c(rep(1, nAparams),
+        ##                .1 * c(seedLmd[lcLmd]),
+        ##                rep(.001,sum(hparam_nl > 0)),
+        ##                rep(1e-2, sum(hparam > 0))))
+      }
     }
 
     if (any(hparam > 0)){
-        ## add regular hyperparameters if theyre not there
-        if (length(seedx) == (sum(lcA0) + sum(lcLmd) + sum(hparam_nl > 0))){
+      ## add regular hyperparameters if theyre not there
+      if (length(seedx) == (sum(lcA0) + sum(lcLmd) + sum(hparam_nl > 0))){
 
-            ## assume we have one of the mn or cosine priors
-            ## this is a quick fix
-            if (!is.null(cosprior)){
-                pv = c(0,
-                       0,
-                       pparams$urprior$lambda,
-                       pparams$urprior$mu,
-                       pparams$cosprior$tight,
-                       pparams$cosprior$smooth,
-                       pparams$cosprior$damp)
-            } else { ## asume mn prior
+        ## assume we have one of the mn or cosine priors
+        ## this is a quick fix
+        if (!is.null(cosprior)){
+          pv <- c(0,
+                  0,
+                  pparams$urprior$lambda,
+                  pparams$urprior$mu,
+                  pparams$cosprior$tight,
+                  pparams$cosprior$smooth,
+                  pparams$cosprior$damp)
+        } else { ## asume mn prior
 
-                pv = c(pparams$mnprior$tight,
-                       pparams$mnprior$decay,
-                       pparams$urprior$lambda,
-                       pparams$urprior$mu,
-                       0,
-                       0,
-                       0)
-            }
-
-            seedx = c(seedx, pv[hparam > 0])
+          pv <- c(pparams$mnprior$tight,
+                  pparams$mnprior$decay,
+                  pparams$urprior$lambda,
+                  pparams$urprior$mu,
+                  0,
+                  0,
+                  0)
         }
+
+        seedx <- c(seedx, pv[hparam > 0])
+      }
     }
 
 
@@ -3836,67 +3795,63 @@ TvvDir = function(dfData, freq = 'monthly',
     ##     ## no nl, or hypers
 
     ##     ##initial inverse hessian; want log stuff to move less in dx = -H0 * g
-    ##     seedH = diag(c(rep(1, nAparams),
+    ##     seedH <- diag(c(rep(1, nAparams),
     ##                    .1 * c(seedLmd[lcLmd])))
-    ##     ##seedH = diag(length(seedx))
+    ##     ##seedH <- diag(length(seedx))
     ## }
 
-    nAparams = sum(lcA0)
+    nAparams <- sum(lcA0)
     if (tvA == TRUE){
-        ## More A0 parameters
-        nAparams = nAparams * nRegimes
+      ## More A0 parameters
+      nAparams <- nAparams * nRegimes
     }
 
-    nLmdparams = sum(lcLmd)
+    nLmdparams <- sum(lcLmd)
 
-    ## seedH = diag(c(rep(1, nAparams),
+    ## seedH <- diag(c(rep(1, nAparams),
     ##                .1 * c(seedLmd[lcLmd]),
     ##                rep(.001,sum(hparam_nl > 0)),
     ##                rep(1e-2, sum(hparam > 0))))
 
 
     if (is.null(seedH)){
-        seedH = diag(c(rep(1, nAparams),
-                       1e-5 * rep(1, nLmdparams),
-                       rep(.001,sum(hparam_nl > 0)),
-                       rep(1e-2, sum(hparam > 0))))
+      seedH <- diag(c(rep(1, nAparams),
+                      1e-5 * rep(1, nLmdparams),
+                      rep(.001,sum(hparam_nl > 0)),
+                      rep(1e-2, sum(hparam > 0))))
     }
 
 
-##########################################################
-    ## Running optimization
-##########################################################
+    ## Running optimization ----
 
     ##Adding zero at beginning of Tsigbrk
-    Tsigbrk = c(0,Tsigbrk)
+    Tsigbrk <- c(0,Tsigbrk)
 
-    ##optoutput = csminwelNew(bvarwrap5, seedx, seedH, nit = 200,
-    ##listData = listData, lcA0 = lcA0, Tsigbrk = Tsigbrk,
-    ##pparams = pparams, nLags = nLags, grad = seedG)
+    ##optoutput <- csminwelNew(bvarwrap5, seedx, seedH, nit = 200,
+    ##listData <- listData, lcA0 = lcA0, Tsigbrk = Tsigbrk,
+    ##pparams <- pparams, nLags = nLags, grad = seedG)
 
     if (tvA == FALSE){
-        lhfcn = bvarwrap5
+      lhfcn <- bvarwrap5
     } else {
-        lhfcn = bvarwrap_tvA
+      lhfcn <- bvarwrap_tvA
     }
 
 
-    optoutput = csminwelNew(lhfcn, seedx, seedH, nit = 5, nCores = nGradcores,
-        listData = listData, lcA0 = lcA0, lcLmd = lcLmd, lmdblock = lmdblock,
-        Tsigbrk = Tsigbrk, pparams = pparams, nLags = nLags, crit = critval,
-        Verbose = FALSE, nVarcores = nVarcores, nlt = nlt, hparam_nl = hparam_nl, hparam = hparam)
+    optoutput <- csminwelNew(lhfcn, seedx, seedH, nit = 500, nCores = nGradcores,
+                             listData = listData, lcA0 = lcA0, lcLmd = lcLmd, lmdblock = lmdblock,
+                             Tsigbrk = Tsigbrk, pparams = pparams, nLags = nLags, crit = critval,
+                             Verbose = FALSE, nVarcores = nVarcores, nlt = nlt, hparam_nl = hparam_nl, hparam = hparam)
 
     ##cleaner pointer names
-    lh = optoutput$fh
-    x = optoutput$xh
+    lh <- optoutput$fh
+    x <- optoutput$xh
 
     ## checking reason for termination above
 
-    term1 = optoutput$retcodeh
+    term1 <- optoutput$retcodeh
 
-######################################################
-    ## Checking optimization, if appropriate
-######################################################
+    ## Checking optimization, if appropriate ----
 
     ## currently, this is triggered for ANYTHING except critical value
     ## termination, or if specified in original TvvVar() call. Does not
@@ -3906,98 +3861,94 @@ TvvDir = function(dfData, freq = 'monthly',
     ## alternatively could make this recursive (keep trying until we reach max iterations
     ## or get a benign termination)
 
-    if (term1 != 0) extracheck = TRUE
+    if (term1 != 0) extracheck <- TRUE
 
     if (extracheck){
-	## checks if we had problems related to bad Hessian by trying with
-	## 'agnostic' Hessian we started with
-	optoutput2 = csminwelNew(lhfcn, x, seedH, nit = 5, nCores = nGradcores,
-                                 listData = listData, lcA0 = lcA0, lcLmd = lcLmd, lmdblock = lmdblock,
-                                 Tsigbrk = Tsigbrk, pparams = pparams, nlt = nlt, hparam_nl = hparam_nl, nLags = nLags, hparam = hparam, crit = critval,
-                                 Verbose = FALSE, nVarcores = nVarcores)
+      ## checks if we had problems related to bad Hessian by trying with
+      ## 'agnostic' Hessian we started with
+      optoutput2 <- csminwelNew(lhfcn, x, seedH, nit = 500, nCores = nGradcores,
+                                listData = listData, lcA0 = lcA0, lcLmd = lcLmd, lmdblock = lmdblock,
+                                Tsigbrk = Tsigbrk, pparams = pparams, nlt = nlt, hparam_nl = hparam_nl, nLags = nLags, hparam = hparam, crit = critval,
+                                Verbose = FALSE, nVarcores = nVarcores)
 
-	term2 = optoutput2$retcodeh
-	different = any((x - optoutput2$xh) < (1e4 * .Machine$double.eps))
+      term2 <- optoutput2$retcodeh
+      different <- any((x - optoutput2$xh) < (1e4 * .Machine$double.eps))
 
-	if (different) {
-            x = optoutput2$xh
-            lh = optoutput$fh
-	}
+      if (different) {
+        x <- optoutput2$xh
+        lh <- optoutput$fh
+      }
 
     } else {
-	different = NULL
-	optoutput2 = NULL
-	term2 = NULL
+      different <- NULL
+      optoutput2 <- NULL
+      term2 <- NULL
     }
 
 
-##########################################################
-    ## Retrieving model and parameters
-##########################################################
+    ## Retrieving model and parameters ----
 
-    ##sigpar = list(A = A, lmd = lmd, Tsigbrk = strTsigbrk)
-    mlmodel = lhfcn(x, verbose = TRUE, listData = listData, nLags = nLags,
-                        lcA0 = lcA0, lmdblock = lmdblock, lcLmd = lcLmd, Tsigbrk = Tsigbrk,
-                        pparams = pparams, nVarcores = nVarcores, nlt = nlt,
-                        hparam_nl = hparam_nl, hparam = hparam)
+    ##sigpar <- list(A = A, lmd = lmd, Tsigbrk = strTsigbrk)
+    mlmodel <- lhfcn(x, verbose = TRUE, listData = listData, nLags = nLags,
+                     lcA0 = lcA0, lmdblock = lmdblock, lcLmd = lcLmd, Tsigbrk = Tsigbrk,
+                     pparams = pparams, nVarcores = nVarcores, nlt = nlt,
+                     hparam_nl = hparam_nl, hparam = hparam)
 
     ##cleaning up pointer names, etc.
-    A = mlmodel$A
-    lmd = mlmodel$llmd ##ACTUAL lmd
-    lambda = mlmodel$lambda ##exponentiated
-    relLambda = lambda / lambda[,1] ##variances relative to the first period
-    vout = mlmodel$vout
-    lh = mlmodel$lh
+    A <- mlmodel$A
+    lmd <- mlmodel$llmd ##ACTUAL lmd
+    lambda <- mlmodel$lambda ##exponentiated
+    relLambda <- lambda / lambda[,1] ##variances relative to the first period
+    vout <- mlmodel$vout
+    lh <- mlmodel$lh
 
-##########################################################
-    ## Calculating an impulse response
-##########################################################
+    ## Calculating an impulse response ----
 
     ## This is a somewhat clumsy way of getting the reduced form parameters,
     ## but this step is very quick anyways
 
-    nLambdas = dim(lambda)[2]
-    ir = array(0, dim = c(nVar, nVar, nStep, nLambdas))
+    nLambdas <- dim(lambda)[2]
+    ir <- array(0, dim = c(nVar, nVar, nStep, nLambdas))
 
     for (iLambda in (1:nLambdas)){
 
-        if (tvA == TRUE){
-            iA = A[,,iLambda]
-        } else{
-            iA = A
-        }
+      if (tvA == TRUE){
+        iA <- A[,,iLambda]
+      } else{
+        iA <- A
+      }
 
 
-	smat = solve(iA) %*% diag(sqrt(lambda[,iLambda]))
-	By = vout$var$By
-	nLags = dim(By)[3]
-	for (iLag in (1:nLags)) {
-            By[,,iLag] = solve(iA) %*% By[,,iLag]
-	}
+      smat <- solve(iA) %*% diag(sqrt(lambda[,iLambda]))
+      By <- vout$var$By
+      nLags <- dim(By)[3]
+      for (iLag in (1:nLags)) {
+        By[,,iLag] <- solve(iA) %*% By[,,iLag]
+      }
 
-	tempvar = vout$var
-	tempvar$By = By
-	ir[,,,iLambda] = impulsdtrf(tempvar, smat = smat, nstep = 60)
-	dimnames(ir[,,,iLambda])[[1]] = vars
+      tempvar <- vout$var
+      tempvar$By <- By
+      ir[,,,iLambda] <- impulsdtrf(tempvar, smat = smat, nstep = 60)
+      dimnames(ir[,,,iLambda])[[1]] <- vars
     }
 
-    output = list(A = A, lmd = lmd, lambda = lambda, relLambda = relLambda,
-        vout = vout, ir = ir, x = x, Tsigbrk = Tsigbrk,
-        startdate = startdate, enddate = enddate, lcLmd = lcLmd,
-        lcA0 = lcA0, logseries = logseries, pparams = pparams,
-        listData = listData, lmdblock = lmdblock, different = different,
-        extracheck = extracheck, term1= term1,
-        term2 = term2, nLags = nLags, lh = lh)
+    output <- list(A = A, lmd = lmd, lambda = lambda, relLambda = relLambda,
+                   vout = vout, ir = ir, x = x, Tsigbrk = Tsigbrk,
+                   startdate = startdate, enddate = enddate, lcLmd = lcLmd,
+                   lcA0 = lcA0, logseries = logseries, pparams = pparams,
+                   listData = listData, lmdblock = lmdblock, different = different,
+                   extracheck = extracheck, term1= term1,
+                   term2 = term2, nLags = nLags, lh = lh)
 
     if (!verbose){
-	return(output)
+      return(output)
     } else {
-	##return full optimization output
-	##return(c(output, list(opt = optoutput, opt2 = optoutput2)))
-	output$opt = optoutput
-	output$opt2 = optoutput2
-	return(output)
+      ##return full optimization output
+      ##return(c(output, list(opt = optoutput, opt2 = optoutput2)))
+      output$opt <- optoutput
+      output$opt2 <- optoutput2
+      return(output)
     }
-}
+  }
 
 
