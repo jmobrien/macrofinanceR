@@ -421,7 +421,7 @@ postdraw <-
 
 rfvar3 <-
   function(ydata=NA,lags=6,xdata=NULL,const=TRUE,breaks=NULL,
-           lambda=5,mu=2,ic=NULL, sigpar=NULL, cores = 1,
+           lambda=5,mu=2,ic=NULL, sigpar=NULL, # cores = 1,
            oweights = NULL, drawbe = FALSE) {
     #### This algorithm goes for accuracy without worrying about memory requirements.
     ####
@@ -464,7 +464,7 @@ rfvar3 <-
     ####      repeating the initial xdata(lags+1,:) row or copying xdata(lags+1:2*lags,:) into
     ####      xdata(1:lags,:) are reasonable subsititutes.  These values are used in forming the
     ####      persistence priors.
-    #### sigpar: list(A0, lmd, Tsigbrk) Allow SVAR with time varying shock variances.  See below.
+    #### sigpar: list(A0, lmd, breaks_pos) Allow SVAR with time varying shock variances.  See below.
     #### returns:
     #### By:      nvar x nvar x lags matrix of coefficients on lagged y's.  1st dimension is "equation number"
     #### Bx:      nvar x nx matrix of coefficients on x's
@@ -476,7 +476,7 @@ rfvar3 <-
     #### Code written by Christopher Sims.  This version 8/13/04.
     #### 12/18/05:  added ts properties for u, better comments.
     ####
-    #### Modified 2013.8.12 to allow use of A0, lmd, Tsigbrk.  With non-null A0, By is A+ from
+    #### Modified 2013.8.12 to allow use of A0, lmd, breaks_pos.  With non-null A0, By is A+ from
     #### A0 %*% y(t) = A+(L) %*% y(t) + exp(.5 lmd(t)) * eps(t) .  This works even with
     #### lmd constant, but in that case running a single rf estimate (A0=I), then iterating
     #### on (A0, lmd) alone makes more sense. With lmd varying, rf estimates change with lmd.
@@ -585,17 +585,17 @@ rfvar3 <-
       }
     }
     if (!is.null(sigpar)) {
-      Tsigbrk <- sigpar$Tsigbrk
+      breaks_pos <- sigpar$breaks_pos
       lmd <- sigpar$lmd
       A0 <- sigpar$A0
-      if (!is.null(Tsigbrk)) {
-        #### Tsigbrk <- invtime(Tsigbrk, ydata) ##so Tsigbrk given as dates
-        nsig <- length(Tsigbrk)
+      if (!is.null(breaks_pos)) {
+        #### breaks_pos <- invtime(breaks_pos, ydata) ##so breaks_pos given as dates
+        nsig <- length(breaks_pos)
       } else {
         nsig <- 1
       }
-      Tsigbrk <- c(Tsigbrk, Tobs)
-      lmdndx <- rep(1:nsig, times=diff(Tsigbrk))
+      breaks_pos <- c(breaks_pos, Tobs)
+      lmdndx <- rep(1:nsig, times=diff(breaks_pos))
       lmdseries <- lmd[ , lmdndx]
       if ( Tsmpl < dim(y)[1] ) {      ##dummy obs formed in rfvar3
         #### Should not be combining this branch with dummy obs's from varprior()

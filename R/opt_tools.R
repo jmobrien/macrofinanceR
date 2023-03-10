@@ -225,7 +225,7 @@ csminit <-
 
 
 csminwelNew <-
-  function(fcn,x0,H0,...,grad=NULL,crit=1e-7,nit,Verbose=TRUE,Long=FALSE,nCores = 1) {
+  function(fcn,x0,H0,...,grad=NULL,crit=1e-7,nit,Verbose=TRUE,Long=FALSE,n_cores = 1) {
     ### fcn:   the objective function to be minimized.  If it has a "gradient" attribute (like output of deriv), that is used
     ###        as analytic gradient.  If it has a "hessian" attribute, that is used as the hessian.
     ### fcn0:  Lean version of fcn, without grad or hessian attributes.  May save time to provide this. (Removed this option for now.)
@@ -244,7 +244,7 @@ csminwelNew <-
     ###        writes g2.mat and g3.mat as well.  If all were written at about the same time, any of them
     ###        may be a decent starting point.  One can also start from the one with best function value.)
 
-    ### nCores: specifies number of cores to use in parallel computation of gradient (can be useful
+    ### n_cores: specifies number of cores to use in parallel computation of gradient (can be useful
     ### if there are lots of variables). Added by Karthik Sastry, July 2014.
 
     dots <- list(...) # (need this to save these arguments in case of cliffs)
@@ -264,7 +264,7 @@ csminwelNew <-
     }
     if( NumGrad ) {
       if( !is.numeric(grad) ) {
-        gbadg <- numgrad(fcn,x0,nCores = nCores,...)
+        gbadg <- numgrad(fcn,x0,n_cores = n_cores,...)
         g <- gbadg$g
         badg <- gbadg$badg
       } else {
@@ -317,7 +317,7 @@ csminwelNew <-
         ##   wall1 <- TRUE; badg1 <- TRUE
         ## } else {                          # not a back-forth wall, so check gradient
         if( NumGrad ) {
-          gbadg <- numgrad(fcn, x1, nCores = nCores,...)
+          gbadg <- numgrad(fcn, x1, n_cores = n_cores,...)
         } else {
           gbadg <- list(g=attr(f1,"gradient"),badg=FALSE)
         }
@@ -345,7 +345,7 @@ csminwelNew <-
           ##     badg2 <- 1
           ##   } else {
           if( NumGrad ){
-            gbadg <- numgrad(fcn, x2, nCores = nCores,...)
+            gbadg <- numgrad(fcn, x2, n_cores = n_cores,...)
           }else{
             gbadg <- list(g=attr(f2,"gradient"),badg=FALSE)
           }
@@ -375,7 +375,7 @@ csminwelNew <-
               ##   badg3 <- 1
               ## } else {
               if( NumGrad ) {
-                gbadg <- numgrad(fcn, x3, nCores = nCores,...)
+                gbadg <- numgrad(fcn, x3, n_cores = n_cores,...)
               }else{
                 gbadg <- list(g=attr(f3,"gradient"),badg=FALSE)
               }
@@ -432,7 +432,7 @@ csminwelNew <-
             nogh <- (!exists("gh",inherits=FALSE) || is.null(gh))
             if( nogh ) {
               if( NumGrad ) {
-                gbadg <- numgrad(fcn,xh, nCores = nCores,...)
+                gbadg <- numgrad(fcn,xh, n_cores = n_cores,...)
               } else {
                 gbadg <- list(g=switch(ih,attr(f1,"gradient"),attr(f2,"gradient"),attr(f3,"gradient")),badg=FALSE)
               }
@@ -492,7 +492,7 @@ csminwelNew <-
 
 
 numgrad <-
-  function(fcn, x, nCores = 1,...) {
+  function(fcn, x, n_cores = 1,...) {
     ## fcn can return a vector, in which case numgrad returns a matrix.
     # delta <- 1e-5
     ## delta <- 1e-8
@@ -524,7 +524,7 @@ numgrad <-
 
     # Parallel implementation:
     vars <- 1:nVar
-    listOutput <- parallel::mclapply(vars, pderv, fcn, x, f0, ..., mc.cores = nCores)
+    listOutput <- parallel::mclapply(vars, pderv, fcn, x, f0, ..., mc.cores = n_cores)
 
     g <- t(matrix(unlist(listOutput), nrow = length(f0)))
     badg <- any(is.nan(g))
