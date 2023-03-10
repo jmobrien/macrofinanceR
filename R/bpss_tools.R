@@ -1046,6 +1046,31 @@ gdraw_1v <-
 
 
 
+#' gibbs draws
+#'
+#' @param tvvModel
+#' @param ndraw
+#' @param lhfcn
+#' @param nburn
+#' @param nsep
+#' @param filename
+#' @param hsnfactor
+#' @param alpha
+#' @param k
+#' @param tparam
+#' @param tscale
+#' @param savespots
+#' @param dscore
+#' @param drawdout
+#' @param drawe
+#' @param drawa
+#' @param hparam_nl
+#' @param nlt
+#'
+#' @return
+#' @export
+#'
+#' @examples
 gdraw <-
   function(tvvModel, ndraw, lhfcn = bvarwrap5,
            nburn = 1e3, nsep = 1e2,
@@ -1658,6 +1683,31 @@ gstep <-
   }
 
 
+#' Impluse plots
+#'
+#' @param ir
+#' @param irdraws
+#' @param conf
+#' @param blocks
+#' @param filename
+#' @param format
+#' @param addtitle
+#' @param nsteps
+#' @param shocknames
+#' @param varnames
+#' @param ptype
+#' @param color
+#' @param alpha
+#' @param gr
+#' @param width
+#' @param height
+#' @param response_ylim
+#' @param xtick
+#'
+#' @return
+#' @export
+#'
+#' @examples
 impulseplots <-
   function(ir, ## array of impulse response objects, nvar x nshock x nperiod
            irdraws = NULL, ## nvar x nshock x nperiod x ndraw
