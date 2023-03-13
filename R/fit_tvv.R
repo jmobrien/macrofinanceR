@@ -257,8 +257,7 @@ fit_tvv <-
         a_sd = a_sd,
         a_diag = a_diag,
         ur_prior = ur_prior,
-        mn_start = mn_start,
-        cos_prior = cos_prior
+        mn_start = mn_start
       )
 
     # Build model seed ----
@@ -296,7 +295,7 @@ fit_tvv <-
       seed_rfmodel <-
         rfvar3(
           ydata = dat_seed,
-          lags = n_lags_rf,
+          n_lags = n_lags_rf,
           lambda = prior_params$ur_prior$lambda,
           mu = prior_params$ur_prior$mu
         )
@@ -496,7 +495,7 @@ fit_tvv <-
         lmdblock = lmdblock,
         breaks_pos = breaks_pos,
         prior_params = prior_params,
-        nLags = n_lags,
+        n_lags = n_lags,
         crit = critval,
         Verbose = FALSE,
         n_cores = n_cores,
@@ -529,24 +528,25 @@ fit_tvv <-
       ## checks if we had problems related to bad Hessian by trying with
       ## 'agnostic' Hessian we started with
       optoutput2 <-
-        csminwelNew(fcn = lhfcn,
-                    x0 = x,
-                    H0 = seed_H,
-                    nit = maxit,
-                    n_cores = n_cores,
-                    dat = dat_ts,
-                    lc_A0 = lc_A0,
-                    lc_lmd = lc_lmd,
-                    lmdblock = lmdblock,
-                    breaks_pos = breaks_pos,
-                    prior_params = prior_params,
-                    nlt = nlt,
-                    hparam_nl = hparam_nl,
-                    n_lags = n_lags,
-                    hparam = hparam,
-                    crit = critval,
-                    Verbose = FALSE,
-                    n_varscores = n_varscores)
+        csminwelNew(
+          fcn = lhfcn,
+          x0 = x, # passing previous state for further runs
+          H0 = seed_H,
+          nit = maxit,
+          n_cores = n_cores,
+          dat = dat_ts,
+          lc_A0 = lc_A0,
+          lc_lmd = lc_lmd,
+          lmdblock = lmdblock,
+          breaks_pos = breaks_pos,
+          prior_params = prior_params,
+          nlt = nlt,
+          hparam_nl = hparam_nl,
+          n_lags = n_lags,
+          hparam = hparam,
+          crit = critval,
+          Verbose = FALSE
+        )
 
       term2 <- optoutput2$retcodeh
       different <- any((x - optoutput2$xh) < (1e4 * .Machine$double.eps))
@@ -574,7 +574,7 @@ fit_tvv <-
         dat = dat_ts,
         n_lags = n_lags,
         lc_A0 = lc_A0, lmdblock = lmdblock, lc_lmd = lc_lmd, breaks_pos = breaks_pos,
-        prior_params = prior_params, n_varscores = n_varscores, nlt = nlt,
+        prior_params = prior_params, nlt = nlt,
         hparam_nl = hparam_nl, hparam = hparam
       )
 
@@ -615,7 +615,7 @@ fit_tvv <-
       # JMO - this nstep was fixed at 60, but seems the same as the n_step (formerly nStep)
       # So I'm passing the n_step to this location:
       ir[,,,iLambda] <- impulsdtrf(tempvar, smat = smat, nstep = n_step)
-      dimnames(ir[,,,iLambda])[[1]] <- vars
+      dimnames(ir[,,,iLambda])[[1]] <- var_names
     }
 
     output <-

@@ -421,7 +421,7 @@ postdraw <-
 
 
 rfvar3 <-
-  function(ydata=NA,lags=6,xdata=NULL,const=TRUE,breaks=NULL,
+  function(ydata=NA,n_lags=6,xdata=NULL,const=TRUE,breaks=NULL,
            lambda=5,mu=2,ic=NULL, sigpar=NULL, # cores = 1,
            oweights = NULL, drawbe = FALSE) {
     #### This algorithm goes for accuracy without worrying about memory requirements.
@@ -436,7 +436,7 @@ rfvar3 <-
     ####          other words it must be a Tx1 array, not a vector of length T.
     ####
     #### const:   If TRUE, a column of ones is added to (or becomes, if xdata is NULL) the xdata matrix.
-    #### lags:    number of lags
+    #### n_lags:    number of lags
     #### breaks:  rows in ydata and xdata after which there is a break.  This allows for
     ####          discontinuities in the data (e.g. war years) and for the possibility of
     ####          adding dummy observations to implement a prior.  This must be a column vector.
@@ -539,27 +539,27 @@ rfvar3 <-
     #### }
     smpl <- NULL
     for (nb in 2:(nbreaks + 2)) {
-      if ( breaks[nb] > breaks[nb-1] + lags )
-        smpl <- c(smpl, (breaks[nb-1] + lags + 1):breaks[nb])
+      if ( breaks[nb] > breaks[nb-1] + n_lags )
+        smpl <- c(smpl, (breaks[nb-1] + n_lags + 1):breaks[nb])
     }
     #### With logic above, one can use an mts-type ydata and omit sections of it by including sequences of breaks separated by
     #### less than lags+1.  E.g. with lags=6, monthly data, breaks=rbind(c(1979,8), c(1980,2), c(1980,8), c(1980,12)) omits
     #### Sep 1979 through Dec 1981, plus 6 months after that, which are initial conditions for the next sample segment.
     Tsmpl <- length(smpl)
-    X <- array(0,dim=c(Tsmpl,nvar,lags))
+    X <- array(0,dim=c(Tsmpl,nvar,n_lags))
     for(ix in seq(along=smpl))
-      X[ix,,] <- t(ydata[smpl[ix]-(1:lags),,drop=FALSE])
-    dim(X) <- c(Tsmpl,nvar*lags)
+      X[ix,,] <- t(ydata[smpl[ix]-(1:n_lags),,drop=FALSE])
+    dim(X) <- c(Tsmpl,nvar*n_lags)
     X <- cbind(X, xdata[smpl,,drop=FALSE])
     y <- ydata[smpl,,drop=FALSE]
     #### Everything now set up with input data for y=Xb+e
     #### ------------------Form persistence dummies-------------------
     if (! (is.null(lambda) & is.null(mu) ) ) {
       if(is.null(ic)) {
-        ybar <- apply(as.array(ydata[1:lags,,drop=FALSE]),2,mean)
+        ybar <- apply(as.array(ydata[1:n_lags,,drop=FALSE]),2,mean)
         dim(ybar) <- c(1,dim(ydata)[2])
         if (!nox) {
-          xbar <- apply(array(xdata[1:lags,,drop=FALSE],dim=c(lags,dim(xdata)[2])),2,mean)
+          xbar <- apply(array(xdata[1:n_lags,,drop=FALSE],dim=c(n_lags,dim(xdata)[2])),2,mean)
           dim(xbar) <- c(1,dim(xdata)[2])
         } else {
           xbar <- NULL
@@ -573,7 +573,7 @@ rfvar3 <-
           lambda <- -lambda
           xbar <- array(0,c(1,dim(xdata)[2]))
         }
-        xdum <- lambda * cbind(array(rep(ybar,lags),dim=c(1,lags*length(ybar))), xbar)
+        xdum <- lambda * cbind(array(rep(ybar,n_lags),dim=c(1,n_lags*length(ybar))), xbar)
         ydum <- array(0,c(1,nvar))
         ydum[1,] <- lambda*ybar
         y <- rbind(y,ydum)
@@ -581,8 +581,8 @@ rfvar3 <-
       }
       if (!is.null(mu)) {
         xdum <- cbind(
-          array(rep(diag(as.vector(ybar),nrow=length(ybar)),lags),
-                dim=c(dim(ybar)[2],dim(ybar)[2]*lags)),
+          array(rep(diag(as.vector(ybar),nrow=length(ybar)),n_lags),
+                dim=c(dim(ybar)[2],dim(ybar)[2]*n_lags)),
           array(0,dim=c(nvar,dim(xdata)[2])))*mu
         ydum <- mu*diag(as.vector(ybar),nrow=length(ybar))
         X <- rbind(X,xdum)
@@ -699,12 +699,12 @@ rfvar3 <-
       xxi <-  crossprod(xxi)
       uraw <- NULL       ## so it won't be missing in the list of outputs
     }
-    if (!is.null(tsp(ydata))) u <- ts(u, start=start(ydata)+c(0,lags),freq=frequency(ydata))
+    if (!is.null(tsp(ydata))) u <- ts(u, start=start(ydata)+c(0,n_lags),freq=frequency(ydata))
     #### dates at end of sample are for dummy obs, meaningless.  If there are other
     #### nontrivial breaks, the dates for u are also meaningless.
     #### dim(B) <-  c(nvar*lags+nx,nvar) ## rhs variables, equations (this was redundant)
-    By <-  B[1:(nvar*lags),]
-    dim(By) <-  c(nvar,lags,nvar)       ## variables, lags, equations
+    By <-  B[1:(nvar*n_lags),]
+    dim(By) <-  c(nvar,n_lags,nvar)       ## variables, lags, equations
     By <-  aperm(By,c(3,1,2)) ##equations, variables, lags to match impulsdt.m
     #### label all the output, if the data matrices had labels
     if(!is.null(dimnames(ydata)[2]))
@@ -723,14 +723,14 @@ rfvar3 <-
         xnames <- rep(" ",times=nx)
       }
     }
-    dimnames(By) <- list(ynames,ynames,as.character(1:lags))
+    dimnames(By) <- list(ynames,ynames,as.character(1:n_lags))
     ##xxinames <- c(paste(rep(ynames,lags),rep(1:lags, each=length(ynames)),sep=""),xnames)
     ##dimnames(xxi) <- list(xxinames,xxinames)
     if (nox)
       Bx <-  NULL
     else
     {
-      Bx <-  matrix(B[nvar*lags+(1:nx),],dim(B)[2],nx)
+      Bx <-  matrix(B[nvar*n_lags+(1:nx),],dim(B)[2],nx)
       dimnames(Bx) <- list(ynames,xnames)
     }
     ###### logintlh <-  matrictint(u'*u,xxi,size(X,1)-nvar-1)-.5*nvar*(nvar+1)*log(2*pi);
