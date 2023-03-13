@@ -32,7 +32,7 @@
 #'   estiamte of the inverse hessian from optimization will be poor
 #' @param n_step
 #' @param extracheck
-#' @param n_varscores
+#' @param n_cores Length-1 Integer (or integer-like numeric). Number of cores used for parallelization
 #' @param seed_x
 #' @param lmd_Prior
 #' @param mn_start
@@ -47,7 +47,6 @@
 #' @param seed_H
 #' @param tvA
 #' @param noLmd
-#' @param cores Length-1 Integer (or integer-like numeric). Number of cores used for parallelization
 #'
 #' @details Automatically 'cleans' but does not load the data. Need to run
 #'   'datacat' or something similar to grab data from different
@@ -74,7 +73,7 @@ fit_tvv <-
     seed_model = NULL,
     n_step = 60,
     extracheck = TRUE,
-    cores = 1, n_varscores = 1,
+    n_cores = 1,
     seed_x = NULL, lmdPrior = FALSE,
     mn_start = 1, mn_tight = 3, mn_decay = 0.5,
     v_prior = 0, cos_prior = NULL,
@@ -94,7 +93,7 @@ fit_tvv <-
     ## Get date variable ----
     date_q <- rlang::enquo(date_var)
     date_pos <- tidyselect::eval_select(date_q, dat)
-    datevar <- dat[date_pos]
+    datevar_orig <- dat[[date_pos]]
 
     ## Make data subset ----
     if(!missing(vars)){
@@ -110,7 +109,7 @@ fit_tvv <-
     if(!missing(vars_log)){
       log_q <- rlang::enquo(vars_log)
       # NB This works on the already subsetted data, so positions match:
-      log_pos <- tidyselect::eval_select(vars_q, dat_touse)
+      log_pos <- tidyselect::eval_select(log_q, dat_touse)
       dat_touse[log_pos] <- log(dat_touse[log_pos]) # needs checks for introduction of NA's
 
       # Names for output later:
@@ -123,21 +122,21 @@ fit_tvv <-
 
     if(!missing(startdate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      begin_pos <- purrr::detect(datevar == startdate)
+      begin_pos <- which(datevar_orig == startdate)
     } else {
-      begin_pos <- purrr::detect(complete.cases(dat_touse))
+      begin_pos <- purrr::detect(dat_touse, complete.cases)
     }
 
     if(!missing(enddate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      end_pos <- purrr::detect(datevar == enddate)
+      end_pos <- which(datevar_orig == enddate)
     } else {
-      end_pos <- length(datevar)
+      end_pos <- length(datevar_orig)
     }
 
     # Slice down to just the time-range specified:
-    dat_touse <- dat_touse[start_pos:end_pos,]
-
+    dat_touse <- dat_touse[begin_pos:end_pos,]
+    datevar <- datevar_orig[begin_pos:end_pos]
     ## Time dummy codes (inactive) ----
 
     ## JMO - taking this out for now until rework is understood:
@@ -183,7 +182,7 @@ fit_tvv <-
 
     # # of variables, variable names, & # of time points (total - lags):
     n_vars <- length(dat_touse)
-    var_names <- names(dat_touse)[[2]]
+    var_names <- names(dat_touse)
     n_obs <- nrow(dat_touse) - n_lags
 
 
@@ -199,9 +198,15 @@ fit_tvv <-
     }
 
 
-    # Setting up prior parameters (formerly pparam()) ----
+    # Setting up prior parameters (formerly pparams()) ----
 
-    if (!missing(mn_tight)){
+    # JMO - previously unaddressed arguments in pparams
+    a_diag = 1
+    ur_lambda <- 5
+    ur_mu <- 1
+
+    # JMO - Needs better checks for both mn_decay and mn_tight
+    if (!is.null(mn_tight)){
       #### if mn prior is specified
       mn_prior <- list(tight = mn_tight, decay = mn_decay)
     } else {
@@ -217,7 +222,7 @@ fit_tvv <-
     ##to tweak v_prior. Else v_prior is just specified as a vector
     ##Could raise an error if length v_prior != n_varss
     if (length(v_prior) == 1 && v_prior == 0){
-      v_prior_sig <- rep(.01, n_var)
+      v_prior_sig <- rep(.01, n_vars)
     } else if (length(v_prior) == 1 && v_prior == 1){
       ##quick fix: v_prior needs to recognize that some variables are percentage points
       v_prior_sig <- c(.01,.01,.01,1,.01,1,1,1)
@@ -233,10 +238,10 @@ fit_tvv <-
     # Build v_prior
     v_prior <- list(sig = v_prior_sig, w = 0)
 
-    # asig, asd, & ur_prior
-    asig <- 2
-    asd <- outer(v_prior$sig, 1/v_prior$sig)
-    ur_prior <- list(lambda = urlambda, mu = urmu)
+    # asig, asd, & urprior
+    a_sig <- 2
+    a_sd <- outer(v_prior$sig, 1/v_prior$sig)
+    ur_prior <- list(lambda = ur_lambda, mu = ur_mu)
 
     # JMO - these were in pprior, but weren't returned by that function?
     # sigfix <- diag(v_prior$sig^2)
@@ -246,11 +251,11 @@ fit_tvv <-
     prior_params <-
       list(
         mn_prior = mn_prior, v_prior = v_prior, cos_prior = cos_prior,
-        asig = asig,
-        asd = asd,
+        a_sig = a_sig,
+        a_sd = a_sd,
+        a_diag = a_diag,
         ur_prior = ur_prior,
         mn_start = mn_start,
-        adiag = adiag,
         cos_prior = cos_prior
       )
 
@@ -288,10 +293,10 @@ fit_tvv <-
       ## Call rfvar3 to build reduced-form model:
       seed_rfmodel <-
         rfvar3(
-          dat = dat_seed,
+          ydata = dat_seed,
           lags = n_lags_rf,
-          lambda = pparams$ur_prior$lambda,
-          mu = pparams$ur_prior$mu
+          lambda = prior_params$ur_prior$lambda,
+          mu = prior_params$ur_prior$mu
         )
 
 
@@ -406,18 +411,18 @@ fit_tvv <-
           pv <-
             c(0,
               0,
-              pparams$ur_prior$lambda,
-              pparams$ur_prior$mu,
-              pparams$cos_prior$tight,
-              pparams$cos_prior$smooth,
-              pparams$cos_prior$damp)
+              prior_params$ur_prior$lambda,
+              prior_params$ur_prior$mu,
+              prior_params$cos_prior$tight,
+              prior_params$cos_prior$smooth,
+              prior_params$cos_prior$damp)
         } else { ## asume mn prior
 
           pv <-
-            c(pparams$mn_prior$tight,
-              pparams$mn_prior$decay,
-              pparams$ur_prior$lambda,
-              pparams$ur_prior$mu,
+            c(prior_params$mn_prior$tight,
+              prior_params$mn_prior$decay,
+              prior_params$ur_prior$lambda,
+              prior_params$ur_prior$mu,
               0,
               0,
               0)
@@ -454,9 +459,9 @@ fit_tvv <-
 
     if (is.null(seed_H)){
       seed_H <- diag(c(rep(1, n_aparams),
-                      1e-5 * rep(1, n_lmd_params),
-                      rep(.001,sum(hparam_nl > 0)),
-                      rep(1e-2, sum(hparam > 0))))
+                       1e-5 * rep(1, n_lmd_params),
+                       rep(.001,sum(hparam_nl > 0)),
+                       rep(1e-2, sum(hparam > 0))))
     }
 
 
@@ -468,7 +473,7 @@ fit_tvv <-
 
     ##optoutput <- csminwelNew(bvarwrap5, seed_x, seed_H, nit = 200,
     ##listData <- listData, lc_A0 = lc_A0, breaks_pos = breaks_pos,
-    ##pparams <- pparams, n_lags = n_lags, grad = seedG)
+    ##prior_params <- prior_params, n_lags = n_lags, grad = seedG)
 
     # Select function to use:
     if (tvA == FALSE){
@@ -482,18 +487,17 @@ fit_tvv <-
       csminwelNew(
         fcn = lhfcn,
         x0 = seed_x,
-        seedH = seed_H,
+        H0 = seed_H,
         nit = maxit,
-        n_cores = n_cores,
         dat = dat_ts,
         lc_A0 = lc_A0, lc_lmd = lc_lmd,
         lmdblock = lmdblock,
         breaks_pos = breaks_pos,
-        pparams = pparams,
+        prior_params = prior_params,
         nLags = n_lags,
         crit = critval,
         Verbose = FALSE,
-        n_varscores = n_varscores,
+        n_cores = n_cores,
         nlt = nlt,
         hparam_nl = hparam_nl,
         hparam = hparam
@@ -533,7 +537,7 @@ fit_tvv <-
                     lc_lmd = lc_lmd,
                     lmdblock = lmdblock,
                     breaks_pos = breaks_pos,
-                    pparams = pparams,
+                    prior_params = prior_params,
                     nlt = nlt,
                     hparam_nl = hparam_nl,
                     n_lags = n_lags,
@@ -568,7 +572,7 @@ fit_tvv <-
         dat = dat_ts,
         n_lags = n_lags,
         lc_A0 = lc_A0, lmdblock = lmdblock, lc_lmd = lc_lmd, breaks_pos = breaks_pos,
-        pparams = pparams, n_varscores = n_varscores, nlt = nlt,
+        prior_params = prior_params, n_varscores = n_varscores, nlt = nlt,
         hparam_nl = hparam_nl, hparam = hparam
       )
 
@@ -615,7 +619,7 @@ fit_tvv <-
       list(A = A, lmd = lmd, lambda = lambda, relLambda = relLambda,
            vout = vout, ir = ir, x = x, breaks_pos = breaks_pos,
            startdate = startdate, enddate = enddate, lc_lmd = lc_lmd,
-           lc_A0 = lc_A0, log_vars = log_vars, pparams = pparams,
+           lc_A0 = lc_A0, log_vars = log_vars, prior_params = prior_params,
            dat_ts = dat_ts, lmdblock = lmdblock,
            different = different,
            extracheck = extracheck, term1 = term1,

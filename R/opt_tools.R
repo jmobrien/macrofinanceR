@@ -35,7 +35,6 @@ bfgsi <-
     return(H)
   }
 
-
 csminit <-
   function(fcn,x0,f0,g0,badg,H0,...){
     ### retcodes: 0, normal step.  5, largest step still improves too fast.
@@ -532,7 +531,6 @@ numgrad <-
 
     return(list(g=g,badg=badg))
   }
-
 
 numHess <-
   function(fcn, x, ...) {
