@@ -124,14 +124,14 @@ fit_tvv <-
 
     if(!missing(startdate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      begin_pos <- which(datevar_orig == startdate)
+      begin_pos <- which(datevar_orig == startdate)[1]
     } else {
-      begin_pos <- purrr::detect(dat_touse, complete.cases)
+      begin_pos <- which(complete.cases(dat_touse))[1]
     }
 
     if(!missing(enddate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      end_pos <- which(datevar_orig == enddate)
+      end_pos <- which(datevar_orig == enddate)[1]
     } else {
       end_pos <- length(datevar_orig)
     }
