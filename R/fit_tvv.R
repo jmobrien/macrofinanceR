@@ -31,6 +31,7 @@
 #'   tweak the prior a bit, the mode will be close to old mode downside:
 #'   estiamte of the inverse hessian from optimization will be poor
 #' @param n_step
+#' @param maxit Integer or integer-like numeric.  Maximum number of iterations.
 #' @param extracheck
 #' @param n_cores Length-1 Integer (or integer-like numeric). Number of cores used for parallelization
 #' @param seed_x
@@ -72,6 +73,7 @@ fit_tvv <-
     verbose = FALSE,
     seed_model = NULL,
     n_step = 60,
+    maxit = 500,
     extracheck = TRUE,
     n_cores = 1,
     seed_x = NULL, lmdPrior = FALSE,
@@ -610,8 +612,9 @@ fit_tvv <-
 
       tempvar <- vout$var
       tempvar$By <- By
-      # JMO - is this nstep different from the nStep (now n_step) used elsewhere?
-      ir[,,,iLambda] <- impulsdtrf(tempvar, smat = smat, nstep = 60)
+      # JMO - this nstep was fixed at 60, but seems the same as the n_step (formerly nStep)
+      # So I'm passing the n_step to this location:
+      ir[,,,iLambda] <- impulsdtrf(tempvar, smat = smat, nstep = n_step)
       dimnames(ir[,,,iLambda])[[1]] <- vars
     }
 
