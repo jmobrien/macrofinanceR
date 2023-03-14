@@ -507,6 +507,7 @@ bvarwrap5 <-
       ## ## lmd[,nSig] <- -log(nSig - apply(exp(-lmd[,1:(nSig-1)]),1,sum))
       lmd[,nSig] <- nSig - apply(lmd[,1:(nSig-1),drop=FALSE],1,sum)
 
+      # check if negative log
 
       ## Calculate prior for lmd
       ## Dirichlet(2) for each equation
@@ -519,6 +520,10 @@ bvarwrap5 <-
       lplmd <- 0
     }
 
+    # testthing <-
+    #   tryCatch(log(lmd), warning = function(w) "warning!")
+    #
+    # if(identical(testthing, "warning!")) browser()
 
     ## possible hyperparameters for the non-linear transformation
     lastvalue <- nA + nLmd ## for picking out extra params
@@ -691,134 +696,6 @@ bvarwrap5 <-
 
   }
 
-
-dataprep <-
-  function(
-    dfData,
-    vars,
-    logseries = c(1,1,1,1,0,0,0,0),
-    differences = rep(0,8),
-    startdate = NULL, enddate = NULL,
-    timedummy = NULL,
-    frequency = 'monthly',
-    Tsigbrk = NULL
-  ){
-
-    ## A simple function to prepare the data
-    ## Takes logarithms and trims the data to desired start and end points (with string inputs)
-    ## Also converts string inputs of break points into the correct numerical indices
-
-    ## END Preamble
-
-
-
-
-    ## Extracting relevant variables ----
-
-    Y <- dfData[,vars]
-
-    ## Finding start point ----
-
-
-    if (!is.null(startdate)) {
-      startdate <- which(dfData[,1] == startdate)
-      ##need this to be 1d object else error
-    } else {
-      ##find first Year in which all data are available
-      missingData <- is.na(Y)
-      anyMissing <- apply(missingData,1,any)
-      allPresent <- which(anyMissing == FALSE, arr.ind = TRUE)
-      startdate <- allPresent[1]
-    }
-
-    ## Finding end point ----
-
-
-    if (!is.null(enddate)) {
-      enddate <- which(dfData[,1] == enddate)
-    } else {
-      enddate <- dim(Y)[1] ##end at last observation
-    }
-
-    ## Applying start and end points ----
-
-    Y <- Y[startdate:enddate,]
-    dates <- dfData[startdate:enddate,1]
-
-    Y <- data.matrix(Y) ##data frame class -> matrix class
-
-
-    ## Applying logarithms and differences ----
-
-    if (sum(logseries) > 0) {
-      ##lc <- logical; prefer 0/1 input so conversion necessary
-      lcLogSeries <- (logseries == 1)
-      Y[,lcLogSeries] <- log(Y[,lcLogSeries])
-    }
-
-    if (sum(differences) > 0) {
-      tempY <- Y
-      for (iColumn in 1:length(differences)) {
-        ##columnwise Kronecker produdct:
-        tempY[,iColumn] <- differences[iColumn] * tempY[,iColumn]
-      }
-      Y <- Y[2:dim(Y)[1],] - tempY[1:(dim(Y)[1] - 1),]
-      ##subtracting lag 1 for differenced series, zeros for other series
-      dates <- dates[2:length(dates)]
-      ##small issue: will waste a row if: d1 series were available at t-1, but d0 series were not, then t will not be used (because it will initially start at t, then start at t+1 after trying to difference)
-    }
-
-    ## Adding date dummies ----
-
-
-    if (!is.null(timedummy)){
-      nDummies <- length(timedummy)
-      dummyMatrix <- matrix(0,length(dates),nDummies)
-      for (iDummy in (1:nDummies)) {
-        if (grepl(':',timedummy[iDummy])){
-          ##dummy for time range
-          endpoints <- strsplit(timedummy[iDummy],':')
-          startPoint <- which(dates == endpoints[1], ind = TRUE)
-          endPoint <- which(dates == endpoints[2], ind = TRUE)
-          dummyMatrix[startPoint:endPoint, iDummy] <- 1
-        } else {
-          ##dummy for single period
-          dummyMatrix[dates == endpoints, iDummy] <- 1
-        }
-      }
-      colnames(dummyMatrix) <- timedummy
-      X <- ts(dummyMatrix)
-    } else {
-      X <- NULL
-    }
-
-    ## Determining date from string ----
-
-    if (!is.null(Tsigbrk)) {
-      nBreaks <- length(Tsigbrk)
-      breakInd <- rep(NA,nBreaks)
-      for (iBreak in (1:nBreaks)){
-        breakInd[iBreak] <- which(dates == Tsigbrk[iBreak], arr.ind = TRUE)
-      }
-    } else {
-      breakInd <- NULL
-    }
-
-    ## Will be implemented later
-
-
-    ## Converting string break dates to integer indices ----
-
-
-    ## Creating time series object ----
-
-    Y <- ts(Y)
-
-    output <-
-      list(Y = Y, X = X, Tsigbrk = breakInd)
-
-    return(output)
-  }
 
 
 drawdelta <-
@@ -1140,19 +1017,16 @@ gdraw <-
     hsn <- tvvModel$opt$H
     x0 <- tvvModel$x
 
-    lcA0 <- tvvModel$lcA0
-    lcLmd <- tvvModel$lcLmd
+    lc_A0 <- tvvModel$lc_A0
+    lc_lmd <- tvvModel$lc_lmd
     ## ndraw <- nsep* ndraw + nburn
-    nvar <- dim(lcA0)[1]
+    nvar <- dim(lc_A0)[1]
 
-    lcA0 <- tvvModel$lcA0
-    lcLmd <- tvvModel$lcLmd
-
-    Tsigbrk <- tvvModel$Tsigbrk
-    pparams <- tvvModel$pparams
-    listData <- tvvModel$listData
+    breaks_pos <- tvvModel$breaks_pos
+    prior_params <- tvvModel$prior_params
+    dat_ts <- tvvModel$dat_ts
     lmdblock <- tvvModel$lmdblock
-    nLags <- tvvModel$nLags
+    n_lags <- tvvModel$n_lags
 
 
     Sigma <- hsnfactor * hsn
@@ -1177,37 +1051,37 @@ gdraw <-
     ## always save delta, a, e in savespots
     if (drawdout){ ## delta_it
       dout <- array(0,
-                    c(dim(listData$Y)[1] - nLags,
-                      dim(listData$Y)[2],
+                    c(dim(dat_ts)[1] - n_lags,
+                      dim(dat_ts)[2],
                       ndraw))
     }  else {
       dout <- array(0,
-                    c(dim(listData$Y)[1] - nLags,
-                      dim(listData$Y)[2],
+                    c(dim(dat_ts)[1] - n_lags,
+                      dim(dat_ts)[2],
                       length(savespots)))
     }
 
     if (drawa){ ## A+
       aout <- array(0,
-                    c(nLags * nvar + 1,
+                    c(n_lags * nvar + 1,
                       nvar,
                       ndraw))
     }  else {
       aout <- array(0,
-                    c(nLags * nvar + 1,
+                    c(n_lags * nvar + 1,
                       nvar,
                       ndraw))
     }
 
     if (drawe){ ## epsilon_it
       eout <- array(0,
-                    c(dim(listData$Y)[1] - nLags,
-                      dim(listData$Y)[2],
+                    c(dim(dat_ts)[1] - n_lags,
+                      dim(dat_ts)[2],
                       ndraw))
     }  else {
       eout <- array(0,
-                    c(dim(listData$Y)[1] - nLags,
-                      dim(listData$Y)[2],
+                    c(dim(dat_ts)[1] - n_lags,
+                      dim(dat_ts)[2],
                       length(savespots)))
     }
 
@@ -1232,18 +1106,18 @@ gdraw <-
     ## Run the Gibbs Sampler
     if (nburn > 0){
       for (iburn in 1:nburn){
-        gout <- gstep(gout, lhfcn, Sigma, lcA0, lcLmd, alpha, k,
-                      lmdblock = lmdblock, Tsigbrk = Tsigbrk,
-                      pparams = pparams, listData = listData, nLags = nLags,
+        gout <- gstep(gout, lhfcn, Sigma, lc_A0, lc_lmd, alpha, k,
+                      lmdblock = lmdblock, breaks_pos = breaks_pos,
+                      prior_params = prior_params, dat = dat_ts, n_lags = n_lags,
                       tparam = tparam, tscale = tscale, drawbe = TRUE,
                       hparam_nl = hparam_nl, nlt = nlt)
       }
     }
     for (idraw in 1:ndraw){
       for (isep in 1:nsep){
-        gout <- gstep(gout, lhfcn, Sigma, lcA0, lcLmd, alpha, k,
-                      lmdblock = lmdblock, Tsigbrk = Tsigbrk,
-                      pparams = pparams, listData = listData, nLags = nLags,
+        gout <- gstep(gout, lhfcn, Sigma, lc_A0, lc_lmd, alpha, k,
+                      lmdblock = lmdblock, breaks_pos = breaks_pos,
+                      prior_params = prior_params, dat = dat_ts, n_lags = n_lags,
                       tparam = tparam, dscore = dscore, tscale = tscale, drawbe =TRUE,
                       hparam_nl = hparam_nl, nlt = nlt)
       }
@@ -1307,7 +1181,7 @@ get_forecast <-
     ## input to this function is full output of optimization
 
 
-    ydata <- as.matrix(tout$listData$Y)
+    ydata <- as.matrix(tout$dat_ts)
 
     ## get the reduced form coefficients
     A <- tout$A
@@ -1505,7 +1379,7 @@ getrmse <-
 
 
 GsnMove <-
-  function(lhfcn, x0, lh0, Sigma, modeA, modeLmd, lcA0, lcLmd,
+  function(lhfcn, x0, lh0, Sigma, modeA, modeLmd, lc_A0, lc_lmd,
            verbose = FALSE, model = NULL, ordercheck = FALSE,...){
 
     ## One iteration of an MCMC run, using a Gaussian transition density
@@ -1520,7 +1394,7 @@ GsnMove <-
 
     x1 <- x0 + MASS::mvrnorm(n = 1, mu = rep(0, length(x0)), Sigma = Sigma)
 
-    newmodel <- lhfcn(x1, lcA0 = lcA0, lcLmd = lcLmd, ..., verbose = TRUE)
+    newmodel <- lhfcn(x1, lc_A0 = lc_A0, lc_lmd = lc_lmd, ..., verbose = TRUE)
     lh1 <- newmodel$lh
 
 
@@ -1533,7 +1407,7 @@ GsnMove <-
       if (ordercheck) {
         mxOutput <- GetALmd(x1)
         perm <- normAlmd(mxOutput$A, mxOutput$lmd, modeA, modeLmd)
-        x1 <- GetX(perm$A, perm$lmd, lcA, lcLmd)
+        x1 <- GetX(perm$A, perm$lmd, lcA, lc_lmd)
 
         reordering <- perm$noloop
       } else {
@@ -1597,7 +1471,7 @@ gstep_1v <-
 
 
 gstep <-
-  function(gout, lhfcn, Sigma, lcA0, lcLmd,
+  function(gout, lhfcn, Sigma, lc_A0, lc_lmd,
            alpha, k,
            tparam = NULL,
            tscale = 1,
@@ -1636,12 +1510,12 @@ gstep <-
     ## markov step
     x <- gout$xout
 
-    model <- lhfcn(x,lcA0,lcLmd, oweights = gout$deltaout,...,verbose = TRUE)
+    model <- lhfcn(x,lc_A0,lc_lmd, oweights = gout$deltaout,...,verbose = TRUE)
     almdout <- GsnMove(lhfcn, x, model$lh, Sigma,
                        modeA = NULL,
                        modeLmd = NULL,
-                       lcA0,
-                       lcLmd,
+                       lc_A0,
+                       lc_lmd,
                        model = model,
                        oweights = gout$deltaout,
                        verbose = TRUE, ...)
@@ -1890,7 +1764,7 @@ impulseplots <-
 
 
 IrRun2 <-
-  function(x, modeA, modeLmd, listData, lcA0, lcLmd, nLags = nLags,
+  function(x, modeA, modeLmd, dat_ts, lc_A0, lc_lmd, nLags = nLags,
            owflag = FALSE, aflag = FALSE, ..., nStep = 60, rootcheck = FALSE, lrange = 1:6){
     ## Main function for drawing impulse responses
     ## It's written in a funny way, with a single draw input x, to facilitate use with
@@ -1899,7 +1773,7 @@ IrRun2 <-
     ## --------------------INPUTS, for all uses--------------------
     ## x : in the base case, this includes only A0 and Lambda
     ## modeA,modeLmd : for unused parts of code that checked ordering. Set to NULL
-    ## lcA0 and lcLmd : logical arrays showing restrictions on A0 and Lmd. Easiest to let these
+    ## lc_A0 and lc_lmd : logical arrays showing restrictions on A0 and Lmd. Easiest to let these
     ## be populated automatically by the parent function McmcIr
     ## nStep : number of steps of impulse responses
     ## lrange : which variance regimes you want IR for. The IR are all the same up to scale
@@ -1910,7 +1784,7 @@ IrRun2 <-
     ## rest of stuff: doesn't really matter
 
     ## --------------------INPUTS, if you haven't drawn A+--------------------
-    ## listData : data in correct format
+    ## dat_ts : data in correct format
     ## owflag : if TRUE, delta_it are at the end of x
     ## rootcheck : if TRUE, will check if roots are stable
     ## ... : extra args passed to LH evalulation function
@@ -1927,36 +1801,36 @@ IrRun2 <-
     ## END PREAMBLE
 
 
-    ## if (length(x) > (sum(lcA0) + sum(lcLmd))){ ## oweights in the mix
+    ## if (length(x) > (sum(lc_A0) + sum(lc_lmd))){ ## oweights in the mix
     if (owflag){
-      oweights <- matrix(x[-(1:(sum(lcA0) + sum(lcLmd)))],
-                         dim(listData$Y)[1] - nLags,dim(lcA0)[1])
+      oweights <- matrix(x[-(1:(sum(lc_A0) + sum(lc_lmd)))],
+                         dim(dat_ts)[1] - nLags,dim(lc_A0)[1])
     } else {
       oweights <- NULL
     }
 
     if (aflag){ ## aplus is already included
-      dimAplus <- c(nrow(lcA0),ncol(lcA0),nLags)
-      Aplus <- matrix(x[-(1:(sum(lcA0) + sum(lcLmd)))],(nrow(lcA0))^2,nrow(lcA0))
+      dimAplus <- c(nrow(lc_A0),ncol(lc_A0),nLags)
+      Aplus <- matrix(x[-(1:(sum(lc_A0) + sum(lc_lmd)))],(nrow(lc_A0))^2,nrow(lc_A0))
 
-      A <- matrix(0,nrow(lcA0),ncol(lcA0))
-      A[lcA0] <- x[1:(sum(lcA0))]
+      A <- matrix(0,nrow(lc_A0),ncol(lc_A0))
+      A[lc_A0] <- x[1:(sum(lc_A0))]
 
 
-      lambda <- matrix(0, dim(lcLmd)[1],dim(lcLmd)[2])
-      lambda[lcLmd] <- x[sum(lcA0) + (1 : sum(lcLmd))]
+      lambda <- matrix(0, dim(lc_lmd)[1],dim(lc_lmd)[2])
+      lambda[lc_lmd] <- x[sum(lc_A0) + (1 : sum(lc_lmd))]
       lambda[,dim(lambda)[2]] <- dim(lambda)[2] -
         apply(lambda[,1:(dim(lambda)[2]-1),drop=FALSE],1,sum)
 
       nVar <- dim(A)[1]
-      vars <- colnames(lcA0)
+      vars <- colnames(lc_A0)
 
       lh <- lh
 
 
     } else { ## needs to be calculated
 
-      mlmodel <- bvarwrap5(x, listData = listData, lcA0 = lcA0, lcLmd = lcLmd, oweights = oweights, verbose = TRUE, nLags = nLags, ...)
+      mlmodel <- bvarwrap5(x, dat = dat_ts, lc_A0 = lc_A0, lc_lmd = lc_lmd, oweights = oweights, verbose = TRUE, nLags = nLags, ...)
 
       lh <- mlmodel$lh
 
@@ -2249,12 +2123,12 @@ McmcIr <-
     listXout <- lapply(1:nX, function(iRow){xout[iRow,]})
 
     listIrtrials <- parallel::mclapply(listXout, IrRun2, model$A,
-                                       model$lmd, model$listData, model$lcA,
-                                       model$lcLmd, nLags = model$nLags,
+                                       model$lmd, model$dat_ts, model$lcA,
+                                       model$lc_lmd, nLags = model$nLags,
                                        owflag = owflag, aflag = aflag,
                                        lmdblock = model$lmdblock,
                                        hparam = hparam,
-                                       Tsigbrk = model$Tsigbrk, pparams = model$pparams,
+                                       breaks_pos = model$breaks_pos, prior_params = model$prior_params,
                                        lmdPrior = model$lmdPrior, rootcheck = rootcheck,
                                        lrange = lrange, nStep = nStep, mc.cores = cores)
 
@@ -2631,53 +2505,6 @@ plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
   }
 
   dev.off()
-}
-
-
-pparams <- function(listData, mnstart = 1, mntight = 3, mndecay = 0.5, vprior = 0,
-                    urlambda = 5, urmu = 1, adiag = 1, cosprior = NULL) {
-
-  ## Generates a list with all the priors/stuff for bvarWrap4
-  ## Intended to keep some of the repetitive stuff outside of iteration/make it easier to tweak
-
-  nVar <- dim(listData$Y)[2]
-  varnames <- dimnames(listData$Y)[[2]]
-
-  if (!is.null(mntight)){ #### if mn prior is specified
-    mnprior <- list(tight = mntight, decay = mndecay)
-  } else {
-    mnprior <- NULL #### no mnprior
-  }
-
-  ## cosprior just passes through
-  ## specify one or the other, probably not both
-
-
-  ##these options are grandfathered in, from a time before we thought it was necessary
-  ##to tweak vprior. Else vprior is just specified as a vector
-  ##Could raise an error if length vprior != nVars
-  if (length(vprior) == 1 && vprior == 0){
-    vprior <- list(sig = rep(.01,nVar), w = 0)
-  } else if (length(vprior) == 1 && vprior == 1){
-    ##quick fix: vprior needs to recognize that some variables are percentage points
-    vprior <- list(sig = c(.01,.01,.01,1,.01,1,1,1), w = 0)
-    ## three log, one pct pt rate, one log, 3 pct pt rate
-  } else { ##if full vprior is provided
-    vprior <- list(sig = vprior, w = 0)
-  }
-
-  asig <- 2
-  asd <- outer(vprior$sig, 1/vprior$sig)
-
-  urprior <- list(lambda = urlambda, mu = urmu)
-
-  sigfix <- diag(vprior$sig^2)
-
-  names(vprior$sig) <- varnames
-  dimnames(sigfix) <- list(varnames, varnames)
-
-  return(list(urprior = urprior, asig = asig, mnprior = mnprior, vprior = vprior, asd = asd, mnstart = mnstart, adiag = adiag, cosprior = cosprior))
-
 }
 
 
