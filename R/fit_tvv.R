@@ -3,14 +3,12 @@
 #' (exp(-lmd[,timePeriod]))
 #'
 #' @param dat Matrix or data frame. Input data
-#' @param date_var Variable in data representing date term.
+#' @param time_var Variable in data recording observation times.
 #' @param y_vars Vector of variables from *dat* to use as endogenous variables
 #'   analysis.  Defaults to all variables.
 #' @param vars_log Vector of variables to log transform in
 #'   analysis. Defaults to NULL (all variables untransformed).
 #' @param startdate,enddate
-#' @param timedummy formatted like start/endDate, but currently not used, could
-#'   input a dummy for one/more period,
 #' @param period_breaks Date or character vector indicating when periods end.
 #'   Should have length of ([# of periods to be specified] - 1).
 #' @param n_lags Integer (or integer-like). Number of lags.
@@ -62,10 +60,10 @@
 fit_tvv <-
   function(
     dat,
-    date_var,
+    time_var,
     y_vars = NULL,
     vars_log = NULL,
-    startdate = NULL, enddate = NULL, timedummy = NULL,
+    startdate = NULL, enddate = NULL,
     period_breaks = NULL,
     n_lags = 10,
     lc_A0 = NULL,
@@ -91,29 +89,30 @@ fit_tvv <-
 
   {
 
-    # Data prep (previously dataprep() function) ----
+
+  # Data prep (previously dataprep() function) ----
 
     ## Get date variable ----
-    date_q <- rlang::enquo(date_var)
-    date_pos <- tidyselect::eval_select(date_q, dat)
-    datevar_orig <- dat[[date_pos]]
+    time_q <- rlang::enquo(time_var)
+    time_pos <- tidyselect::eval_select(time_q, dat)
+    time_orig <- dat[[time_pos]]
 
     ## Make data subset ----
     if(!missing(vars)){
       vars_q <- rlang::enquo(vars)
       vars_pos <- tidyselect::eval_select(vars_q, dat)
-      dat_touse <- dat[vars_pos]
+      dat_y_df <- dat[vars_pos]
     } else {
       # if no selection just remove the date variable:
-      dat_touse <- dat[-date_pos]
+      dat_y_df <- dat[-date_pos]
     }
 
     ## Log transforms ----
     if(!missing(vars_log)){
       log_q <- rlang::enquo(vars_log)
       # NB This works on the already subsetted data, so positions match:
-      log_pos <- tidyselect::eval_select(log_q, dat_touse)
-      dat_touse[log_pos] <- log(dat_touse[log_pos]) # needs checks for introduction of NA's
+      log_pos <- tidyselect::eval_select(log_q, dat_y_df)
+      dat_y_df[log_pos] <- log(dat_y_df[log_pos]) # needs checks for introduction of NA's
 
       # Names for output later:
       log_vars <- names(log_pos)
@@ -125,67 +124,34 @@ fit_tvv <-
 
     if(!missing(startdate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      begin_pos <- which(datevar_orig == startdate)[1]
+      begin_pos <- which(dates_orig == startdate)[1]
     } else {
-      begin_pos <- which(complete.cases(dat_touse))[1]
+      begin_pos <- which(complete.cases(dat_y_df))[1]
     }
 
     if(!missing(enddate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      end_pos <- which(datevar_orig == enddate)[1]
+      end_pos <- which(dates_orig == enddate)[1]
     } else {
-      end_pos <- length(datevar_orig)
+      end_pos <- length(dates_orig)
     }
 
     # Slice down to just the time-range specified:
-    dat_touse <- dat_touse[begin_pos:end_pos,]
-    datevar <- datevar_orig[begin_pos:end_pos]
+    dat_y_df <- dat_y_df[begin_pos:end_pos,]
+    time <- times_orig[begin_pos:end_pos]
     ## Time dummy codes (inactive) ----
-
-    ## JMO - taking this out for now until rework is understood:
-
-    # if (!is.null(timedummy)){
-    #
-    #   n_dummies <- length(timedummy)
-    #   dummyMatrix <- matrix(0, nrow = length(dates), ncol = n_dummies)
-    #
-    #
-    #   for (i_dum in (1:n_dummies)) {
-    #     if (grepl(':',timedummy[i_dum])){
-    #       ##dummy for time range
-    #       time_range <- strsplit(timedummy[i_dum],':')
-    #       start_point <- which(dates == time_range[1], ind = TRUE)
-    #       end_point <- which(dates == time_range[2], ind = TRUE)
-    #       dummyMatrix[startPoint:endPoint, i_dum] <- 1
-    #     } else {
-    #       ##dummy for single period
-    #       dummyMatrix[dates == endpoints, i_dum] <- 1
-    #     }
-    #   }
-    #   colnames(dummyMatrix) <- timedummy
-    #   X <- ts(dummyMatrix)
-    #
-    # ## Empty X if time dummies not provided:
-    # } else {
-    #   X <- NULL
-    # }
 
     ## Breaks for periods ----
 
     ## Index of breaks position based on breaks date input (formerly breaks_pos):
     ## JMO - needs checks:
-    breaks_pos <- which(datevar %in% period_breaks)
+    breaks_pos <- which(dates %in% period_breaks)
 
     ## MAIN DATA - construct timeseries ----
-    dat_ts <- ts(dat_touse)
+    dat_y_ts <- ts(dat_y_df)
 
 
-    # Initial optimization params ----
-
-    ##Current method: Estimate a full-sample model and use linear projections
-    ##to get individual lmd
-    ##Restrictions on A0, lmd by brute force (seed model has no restrictions)
-
+  # Initial optimization params ----
 
     # Default A0 matrix if needed:
     if (missing(lc_A0)) {
@@ -196,16 +162,18 @@ fit_tvv <-
 
 
 
-    # Construct unified model object ----
+  # Construct unified model object ----
     tvv_mod <-
       list(
         # Y variables:
-        y = dat_ts,
-        y_n_vars = length(dat_touse),
-        y_names = names(dat_touse),
+        y = dat_y_ts,
+        y_n_vars = length(dat_y_df),
+        y_names = names(dat_y_df),
+        # Time record varaiable:
+        time = time,
         # Observations, total and effective (less # lags):
-        n_obs = nrow(dat_touse),
-        n_obs_eff = nrow(dat_touse) - n_lags,
+        n_obs = nrow(dat_y_df),
+        n_obs_eff = nrow(dat_y_df) - n_lags,
         # Lags:
         n_lags = n_lags,
 
@@ -214,10 +182,10 @@ fit_tvv <-
 
     ## Key data aspects
 
-    # Setting up prior parameters (formerly pparams()) ----
+  # Setting up prior parameters (formerly pparams()) ----
 
     # JMO - previously unaddressed arguments in pparams (add to fit_tvv() args?)
-    a_diag = 1
+    a_diag <- 1
     ur_lambda <- 5
     ur_mu <- 1
 
@@ -239,12 +207,6 @@ fit_tvv <-
     ##Could raise an error if length v_prior != n_varss
     if (length(v_prior) == 1 && v_prior == 0){
       v_prior_sig <- rep(.01, n_vars)
-    } else if (length(v_prior) == 1 && v_prior == 1){
-      # JMO removed as this is a hack for something else apparently - wouldn't match with the # of variables:
-      # However, this seems to exist for percentage variables that would need a 1 weight rather than .01
-      ##quick fix: v_prior needs to recognize that some variables are percentage points
-      # v_prior_sig <- c(.01,.01,.01,1,.01,1,1,1)
-      ## three log, one pct pt rate, one log, 3 pct pt rate
     } else {
       ##if full v_prior is providedL:
       v_prior_sig <- v_prior
@@ -263,11 +225,6 @@ fit_tvv <-
     # ur_prior
     ur_prior <- list(lambda = ur_lambda, mu = ur_mu)
 
-    # JMO - these were in pprior, but weren't returned by that function?
-    # sigfix is used (generated again) in varpriorN, which is called by no other function
-    # sigfix <- diag(v_prior$sig^2)
-    # dimnames(sigfix) <- list(var_names, var_names)
-
     # Construct list of params (might drop later unless pparam reintroduced):
     prior_params <-
       list(
@@ -281,7 +238,7 @@ fit_tvv <-
         v_prior = v_prior
       )
 
-    # Build model seeds ----
+  # Build model seeds ----
 
     seeds <- list()
 
@@ -352,21 +309,6 @@ fit_tvv <-
       seeds$A_inv <- solve(seeds$A)
       seeds$A_inv[upper.tri(seeds$A_inv)] <- 0
 
-      ## if (n_regimes == 1) { ##one regime, no need for below
-      ## 	seed_lmd <- fullLmd
-      ## } else{
-      ## 	for (iRegime in (1:n_regimes)) {
-      ## 		iRange <- (regimes[iRegime] + 1) : (regimes[iRegime + 1])
-      ## 		##breaks_pos indicates new regime starts at next time
-      ## 		iU <- u[iRange,]
-      ## 		iOmega <- crossprod(iU) / dim(iU)[1] ##reduced form variances
-      ## 		iLambda <- seed_Ainv %*% iOmega %*% t(seed_Ainv) ##structural variances, in a sense
-      ## 		##Just taking diagonal elements
-      ## 		seed_lmd[,iRegime] <- -log(diag(iLambda))
-      ## 	}
-      ## }
-
-      ## fullLmd <- kronecker(matrix(fullLmd,nrow = length(fullLmd)),t(rep(1,n_regimes)))
     }
 
 
@@ -389,16 +331,15 @@ fit_tvv <-
         for (iRep in 2:nReps) {
           lc_lmd[reps[iRep]] <- FALSE
         }
-        ##(lc_lmd[which(lmd_block[,,iBlock])[-1]]) =
-        ##rep(FALSE, length(which(lmd_block[,,iBlock])) - 1) ##fill in first of the block
 
         if (is.null(seed_model)){
-          ## seed_lmd[lmd_block[,,iBlock]] <- fullLmd[lmd_block[,,iBlock]] ##seed with full sample lmd estimates
           seed_lmd[lmd_block[,,iBlock]] <- 1 ##seed with full sample lmd estimates
         }
       }
     }
 
+
+    # JMO - print message/warning for this adjustmnet?
     ## If number of lambda parameters = number of variables, don't include any lambda parameters
     ## ie variances are constant
     if (sum(lc_lmd) <= n_vars){
@@ -505,7 +446,7 @@ fit_tvv <-
     }
 
 
-    # Running optimization ----
+  # Running optimization ----
 
     ##Adding zero at beginning of breaks_pos
     breaks_pos <- c(0, breaks_pos)
@@ -529,7 +470,7 @@ fit_tvv <-
         x0 = seed_x,
         H0 = seed_H,
         nit = maxit,
-        dat = dat_ts,
+        dat = dat_y_ts,
         lc_A0 = lc_A0, lc_lmd = lc_lmd,
         lmd_block = lmd_block,
         breaks_pos = breaks_pos,
@@ -573,7 +514,7 @@ fit_tvv <-
           H0 = seed_H,
           nit = maxit,
           n_cores = n_cores,
-          dat = dat_ts,
+          dat = dat_y_ts,
           lc_A0 = lc_A0,
           lc_lmd = lc_lmd,
           lmd_block = lmd_block,
@@ -610,7 +551,7 @@ fit_tvv <-
     mlmodel <-
       lhfcn(
         x, verbose = TRUE,
-        dat = dat_ts,
+        dat = dat_y_ts,
         n_lags = n_lags,
         lc_A0 = lc_A0, lmd_block = lmd_block,
         lc_lmd = lc_lmd,
@@ -666,7 +607,7 @@ fit_tvv <-
            vout = vout, ir = ir, x = x, breaks_pos = breaks_pos,
            startdate = startdate, enddate = enddate, lc_lmd = lc_lmd,
            lc_A0 = lc_A0, log_vars = log_vars, prior_params = prior_params,
-           y = dat_ts, lmd_block = lmd_block,
+           y = dat_y_ts, lmd_block = lmd_block,
            different = different,
            extracheck = extracheck, term1 = term1,
            term2 = term2, n_lags = n_lags, lh = lh)
