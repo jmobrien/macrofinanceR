@@ -4,10 +4,10 @@
 #'
 #' @param dat Matrix or data frame. Input data
 #' @param date_var Variable in data representing date term.
-#' @param vars Vector of variables from *dat* to use in
+#' @param y_vars Vector of variables from *dat* to use as endogenous variables
 #'   analysis.  Defaults to all variables.
 #' @param vars_log Vector of variables to log transform in
-#'   analysis. Defaults to all variables untransformed.
+#'   analysis. Defaults to NULL (all variables untransformed).
 #' @param startdate,enddate
 #' @param timedummy formatted like start/endDate, but currently not used, could
 #'   input a dummy for one/more period,
@@ -17,37 +17,37 @@
 #' @param lc_A0 An *n* x *n* matrix, where *n* is the number of variables used.
 #'   Each element indicates TRUE for a fitted value and FALSE for a non-fitted
 #'   value. If NULL (default) uses lower triangular with TRUE on diagonal, and
-#'   zero to other FALSE fields.
-#' @param lmdblock n_vars x nPeriods x n_blocks array that identifies, with TRUE,
+#'   FALSE elsewhere.
+#' @param noLmd
+#' @param lmd_block n_vars x nPeriods x n_blocks array that identifies, with TRUE,
 #'   blocks of parameters that are constant (presumably across periods). The
 #'   most obvious application is keeping certain parameters constant over
 #'   periods, but it could also be used to have one value in 1/2 the periods,
 #'   another in the other half, etc. If left null, all variances change in every
 #'   period.specifies exactly how to restrict some variances not to be
 #'   time-varying. Not used in the most recent calculations.
-#' @param verbose Boolean. if TRUE (default), gives additional output during run
+#' @param lmd_prior Boolean. use a prior for lmd? (not implemented?)
 #' @param seed_model a list that looks like the output of this function from
 #'   which a first iteration x vector can be extracted intended usage: if you
 #'   tweak the prior a bit, the mode will be close to old mode downside:
 #'   estiamte of the inverse hessian from optimization will be poor
-#' @param n_step
-#' @param maxit Integer or integer-like numeric.  Maximum number of iterations.
-#' @param extracheck
-#' @param n_cores Length-1 Integer (or integer-like numeric). Number of cores used for parallelization
 #' @param seed_x
-#' @param lmd_Prior
+#' @param seed_H
+#' @param tvA
 #' @param mn_start
 #' @param mn_tight
 #' @param mn_decay
 #' @param v_prior
 #' @param cos_prior
-#' @param nlt
-#' @param hparam_nl
+#' @param nlt nonlinear transformation
 #' @param hparam
-#' @param critval
-#' @param seed_H
-#' @param tvA
-#' @param noLmd
+#' @param hparam_nl
+#' @param critval critical value for model fitting.  defaults to 1e-10.
+#' @param n_step
+#' @param maxit Integer or integer-like numeric.  Maximum number of iterations.
+#' @param extracheck
+#' @param verbose Boolean. if TRUE (default), gives additional output during run
+#' @param n_cores Length-1 Integer (or integer-like numeric). Number of cores used for parallelization
 #'
 #' @details Automatically 'cleans' but does not load the data. Need to run
 #'   'datacat' or something similar to grab data from different
@@ -63,32 +63,33 @@ fit_tvv <-
   function(
     dat,
     date_var,
-    vars = NULL,
+    y_vars = NULL,
     vars_log = NULL,
     startdate = NULL, enddate = NULL, timedummy = NULL,
     period_breaks = NULL,
     n_lags = 10,
     lc_A0 = NULL,
-    lmdblock = NULL,
-    verbose = FALSE,
+    noLmd = FALSE,
+    lmd_block = NULL,
+    lmd_prior = FALSE,
     seed_model = NULL,
-    n_step = 60,
-    maxit = 500,
-    extracheck = TRUE,
-    n_cores = 1,
-    seed_x = NULL, lmdPrior = FALSE,
+    seed_x = NULL,
+    seed_H = NULL,
+    tvA = FALSE,
     mn_start = 1, mn_tight = 3, mn_decay = 0.5,
     v_prior = 0, cos_prior = NULL,
     nlt = NULL,
-    hparam_nl = rep(0,3), hparam = rep(0,7),
+    hparam = rep(0,7),
+    hparam_nl = rep(0,3),
     critval = 1e-10,
-    seed_H = NULL,
-    tvA = FALSE,
-    noLmd = FALSE
+    n_step = 60,
+    maxit = 500,
+    extracheck = TRUE,
+    verbose = FALSE,
+    n_cores = 1
   )
 
   {
-
 
     # Data prep (previously dataprep() function) ----
 
@@ -175,23 +176,17 @@ fit_tvv <-
     ## JMO - needs checks:
     breaks_pos <- which(datevar %in% period_breaks)
 
-
     ## MAIN DATA - construct timeseries ----
     dat_ts <- ts(dat_touse)
 
 
     # Initial optimization params ----
 
-    # # of variables, variable names, & # of time points (total - lags):
-    n_vars <- length(dat_touse)
-    var_names <- names(dat_touse)
-    n_obs <- nrow(dat_touse) - n_lags
-
-
     ##Current method: Estimate a full-sample model and use linear projections
     ##to get individual lmd
-
     ##Restrictions on A0, lmd by brute force (seed model has no restrictions)
+
+
     # Default A0 matrix if needed:
     if (missing(lc_A0)) {
       ##lower triangular default structure:
@@ -200,9 +195,28 @@ fit_tvv <-
     }
 
 
+
+    # Construct unified model object ----
+    tvv_mod <-
+      list(
+        # Y variables:
+        y = dat_ts,
+        y_n_vars = length(dat_touse),
+        y_names = names(dat_touse),
+        # Observations, total and effective (less # lags):
+        n_obs = nrow(dat_touse),
+        n_obs_eff = nrow(dat_touse) - n_lags,
+        # Lags:
+        n_lags = n_lags,
+
+        breaks_pos = breaks_pos
+      )
+
+    ## Key data aspects
+
     # Setting up prior parameters (formerly pparams()) ----
 
-    # JMO - previously unaddressed arguments in pparams
+    # JMO - previously unaddressed arguments in pparams (add to fit_tvv() args?)
     a_diag = 1
     ur_lambda <- 5
     ur_mu <- 1
@@ -226,8 +240,10 @@ fit_tvv <-
     if (length(v_prior) == 1 && v_prior == 0){
       v_prior_sig <- rep(.01, n_vars)
     } else if (length(v_prior) == 1 && v_prior == 1){
+      # JMO removed as this is a hack for something else apparently - wouldn't match with the # of variables:
+      # However, this seems to exist for percentage variables that would need a 1 weight rather than .01
       ##quick fix: v_prior needs to recognize that some variables are percentage points
-      v_prior_sig <- c(.01,.01,.01,1,.01,1,1,1)
+      # v_prior_sig <- c(.01,.01,.01,1,.01,1,1,1)
       ## three log, one pct pt rate, one log, 3 pct pt rate
     } else {
       ##if full v_prior is providedL:
@@ -240,52 +256,68 @@ fit_tvv <-
     # Build v_prior
     v_prior <- list(sig = v_prior_sig, w = 0)
 
-    # asig, asd, & urprior
+    # asig, asd,
     a_sig <- 2
     a_sd <- outer(v_prior$sig, 1/v_prior$sig)
+
+    # ur_prior
     ur_prior <- list(lambda = ur_lambda, mu = ur_mu)
 
     # JMO - these were in pprior, but weren't returned by that function?
+    # sigfix is used (generated again) in varpriorN, which is called by no other function
     # sigfix <- diag(v_prior$sig^2)
     # dimnames(sigfix) <- list(var_names, var_names)
 
     # Construct list of params (might drop later unless pparam reintroduced):
     prior_params <-
       list(
-        mn_prior = mn_prior, v_prior = v_prior, cos_prior = cos_prior,
         a_sig = a_sig,
         a_sd = a_sd,
         a_diag = a_diag,
+        cos_prior = cos_prior,
+        mn_prior = mn_prior,
+        mn_start = mn_start,
         ur_prior = ur_prior,
-        mn_start = mn_start
+        v_prior = v_prior
       )
 
-    # Build model seed ----
+    # Build model seeds ----
+
+    seeds <- list()
 
     ## Use previous output of routine
     if (!is.null(seed_model)){
 
       ##program will re-apply zero restrictions as appropriate, but number of variables
       ##must be correct
-      seed_lmd <- seed_model$lambda ## not lmd for this model
-      seed_A <- seed_model$A
 
-      n_regimes <- dim(seed_lmd)[2]
+      seeds$A <- seed_model$A
+      seeds$lmd <- seed_model$lambda
+
+      seeds$n_regimes <-
+        seed_model$lambda |>
+        ncol()
 
       ### New seed not provided, generate
     } else if (is.null(seed_x)){
 
+      ## JMO - need to check that hparam_nl & nlt are both present and correct format:
+
       ##project a reduced form with fixed variances onto the format we want
       if (any(hparam_nl > 0)){
         ## apply the nonlinear transformation via helper function:
-        dat_seed <- transform_nl(dat_ts,nlt)$data
+        dat_seed <-
+          transform_nl(tvv_mod$y, nlt)$data
       } else{
-        dat_seed <- dat_ts
+        dat_seed <- tvv_mod$y
       }
 
       ## JMO - needs review?
       ## Hack to deal with dimensionality problem
-      if ((n_lags * n_vars) > (n_obs - n_lags)){
+
+      if (
+        (tvv_mod$n_lags * tvv_mod$n_vars) > (tvv_mod$n_obs - tvv_mod$n_lags)
+      ) {
         n_lags_rf <- 4 ## crude
       } else {
         n_lags_rf <- n_lags
@@ -300,22 +332,25 @@ fit_tvv <-
           mu = prior_params$ur_prior$mu
         )
 
-
-      temp_A_inv <-
-        (t(chol(crossprod(seed_rfmodel$u) / dim(seed_rfmodel$u)[1]))) ##unscaled
-
       u <- seed_rfmodel$u
-      regimes <- c(0, breaks_pos - n_lags_rf, n_obs)
-      n_regimes <- length(regimes) - 1
-      seed_lmd <- matrix(1, n_vars, n_regimes)
 
-      seed_A <- solve(temp_A_inv)
+      # unscaled
+      temp_A_inv <-
+        (crossprod(u) / nrow(u)) |>
+        chol() |>
+        t()
 
-      seed_A[!lc_A0] <- 0 ##restrictions
-      seed_A[upper.tri(seed_A)] <- 0 ##avoiding floating point junk; unclear if important
+      seed$A <- solve(temp_A_inv)
+      seeds$lmd <- matrix(1, tvv_mod$y_n_vars, seeds$n_regimes)
+      seeds$regimes <- c(0, tvv_mod$breaks_pos - n_lags_rf, tvv_mod$n_obs)
+      seeds$n_regimes <- length(seeds$regimes) - 1
 
-      seed_A_inv <- solve(seed_A)
-      seed_A_inv[upper.tri(seed_A_inv)] <- 0
+
+      seed$A[!tvv_mod$lc_A0] <- 0 ##restrictions
+      seed$A[upper.tri(seed$A)] <- 0 ##avoiding floating point junk; unclear if important
+
+      seeds$A_inv <- solve(seeds$A)
+      seeds$A_inv[upper.tri(seeds$A_inv)] <- 0
 
       ## if (n_regimes == 1) { ##one regime, no need for below
       ## 	seed_lmd <- fullLmd
@@ -334,28 +369,32 @@ fit_tvv <-
       ## fullLmd <- kronecker(matrix(fullLmd,nrow = length(fullLmd)),t(rep(1,n_regimes)))
     }
 
-    ##like lc_A0, tells program what values to fill from x
-    n_regimes <- length(period_breaks) + 1
-    lc_lmd <- matrix(TRUE, nrow = n_vars, ncol = n_regimes)
-    lc_lmd[,n_regimes] <- FALSE
 
-    if (!is.null(lmdblock)){
+    # JMO - this seems to overwrite the seed model above?
+
+    ##like lc_A0, tells program what values to fill from x
+    seeds$n_regimes <- length(tvv_mod$period_breaks) + 1
+    seeds$lc_lmd <- matrix(TRUE, nrow = tvv_mod$n_vars, ncol = seeds$n_regimes)
+    seeds$lc_lmd[,seeds$n_regimes] <- FALSE
+
+    if (!is.null(tvv_mod$lmd_block)){
       ##generate matrix that tells optimizer what to fill in lmd
-      n_blocks <- dim(lmdblock)[3]
+      n_blocks <- dim(lmd_block)[3]
+
       for (iBlock in 1:n_blocks){
         ##could not get logical indexing to work here at all, so I'm doing an awkward loop
-        reps <- which(lmdblock[,,iBlock])
+        reps <- which(lmd_block[,,iBlock])
         nReps <- length(reps)
 
         for (iRep in 2:nReps) {
           lc_lmd[reps[iRep]] <- FALSE
         }
-        ##(lc_lmd[which(lmdblock[,,iBlock])[-1]]) =
-        ##rep(FALSE, length(which(lmdblock[,,iBlock])) - 1) ##fill in first of the block
+        ##(lc_lmd[which(lmd_block[,,iBlock])[-1]]) =
+        ##rep(FALSE, length(which(lmd_block[,,iBlock])) - 1) ##fill in first of the block
 
         if (is.null(seed_model)){
-          ## seed_lmd[lmdblock[,,iBlock]] <- fullLmd[lmdblock[,,iBlock]] ##seed with full sample lmd estimates
-          seed_lmd[lmdblock[,,iBlock]] <- 1 ##seed with full sample lmd estimates
+          ## seed_lmd[lmd_block[,,iBlock]] <- fullLmd[lmd_block[,,iBlock]] ##seed with full sample lmd estimates
+          seed_lmd[lmd_block[,,iBlock]] <- 1 ##seed with full sample lmd estimates
         }
       }
     }
@@ -492,7 +531,7 @@ fit_tvv <-
         nit = maxit,
         dat = dat_ts,
         lc_A0 = lc_A0, lc_lmd = lc_lmd,
-        lmdblock = lmdblock,
+        lmd_block = lmd_block,
         breaks_pos = breaks_pos,
         prior_params = prior_params,
         n_lags = n_lags,
@@ -537,7 +576,7 @@ fit_tvv <-
           dat = dat_ts,
           lc_A0 = lc_A0,
           lc_lmd = lc_lmd,
-          lmdblock = lmdblock,
+          lmd_block = lmd_block,
           breaks_pos = breaks_pos,
           prior_params = prior_params,
           nlt = nlt,
@@ -573,9 +612,13 @@ fit_tvv <-
         x, verbose = TRUE,
         dat = dat_ts,
         n_lags = n_lags,
-        lc_A0 = lc_A0, lmdblock = lmdblock, lc_lmd = lc_lmd, breaks_pos = breaks_pos,
-        prior_params = prior_params, nlt = nlt,
-        hparam_nl = hparam_nl, hparam = hparam
+        lc_A0 = lc_A0, lmd_block = lmd_block,
+        lc_lmd = lc_lmd,
+        breaks_pos = breaks_pos,
+        prior_params = prior_params,
+        nlt = nlt,
+        hparam_nl = hparam_nl,
+        hparam = hparam
       )
 
     ##cleaning up pointer names, etc.
@@ -623,7 +666,7 @@ fit_tvv <-
            vout = vout, ir = ir, x = x, breaks_pos = breaks_pos,
            startdate = startdate, enddate = enddate, lc_lmd = lc_lmd,
            lc_A0 = lc_A0, log_vars = log_vars, prior_params = prior_params,
-           dat_ts = dat_ts, lmdblock = lmdblock,
+           y = dat_ts, lmd_block = lmd_block,
            different = different,
            extracheck = extracheck, term1 = term1,
            term2 = term2, n_lags = n_lags, lh = lh)
