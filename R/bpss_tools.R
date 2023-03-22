@@ -946,7 +946,6 @@ gdraw_1v <-
 #' @return
 #' @export
 #'
-#' @examples
 gdraw <-
   function(tvvModel, ndraw, lhfcn = bvarwrap5,
            nburn = 1e3, nsep = 1e2,
@@ -1170,6 +1169,15 @@ gdraw <-
 
 
 
+#' gets a forecast nperiods into the future
+#'
+#' @param tout full output of optimization
+#' @param nperiods number of periods into future to forecast
+#' @param Tobs Total number of observations
+#'
+#' @return
+#' @export
+#'
 get_forecast <-
   function(tout,
            nperiods = 8,
@@ -1226,6 +1234,19 @@ get_forecast <-
   }
 
 
+#' Title Small wrapper function for calculated mdd with MHM methods
+#'
+#' @param x draws in a matrix
+#' @param lh vector of -log posterior densities (conditional on certain params)
+#' @param trunc extra piece numerator density for MHM
+#' @param delta delta_it in an array, if appropriate
+#' @param alpha,beta parameters for the distribution of the delta (maybe you should change this)
+#' @param efac extra piece numerator density for MHM
+#' @param covsub whether to calc covariance matrix with all xout, or 5000 evenly spaced draws
+#'
+#' @return
+#' @export
+#'
 get_mdd <-
   function(x, lh, trunc = .95, delta = NULL,
            alpha =3, beta = 3, efac = NULL,
@@ -1345,6 +1366,15 @@ get_mdd <-
 
 
 
+#' Title get root mean squared error
+#'
+#' @param fcast fcast array
+#' @param ydata model data for Y
+#' @param h
+#'
+#' @return
+#' @export
+#'
 getrmse <-
   function(fcast,ydata,h = c(1,6,12,24,48)){
 
@@ -1764,7 +1794,7 @@ impulseplots <-
 
 
 IrRun2 <-
-  function(x, modeA, modeLmd, dat_ts, lc_A0, lc_lmd, nLags = nLags,
+  function(x, modeA, modeLmd, dat_ts, lc_A0, lc_lmd, n_lags = n_lags,
            owflag = FALSE, aflag = FALSE, ..., nStep = 60, rootcheck = FALSE, lrange = 1:6){
     ## Main function for drawing impulse responses
     ## It's written in a funny way, with a single draw input x, to facilitate use with
@@ -1804,13 +1834,13 @@ IrRun2 <-
     ## if (length(x) > (sum(lc_A0) + sum(lc_lmd))){ ## oweights in the mix
     if (owflag){
       oweights <- matrix(x[-(1:(sum(lc_A0) + sum(lc_lmd)))],
-                         dim(dat_ts)[1] - nLags,dim(lc_A0)[1])
+                         dim(dat_ts)[1] - n_lags,dim(lc_A0)[1])
     } else {
       oweights <- NULL
     }
 
     if (aflag){ ## aplus is already included
-      dimAplus <- c(nrow(lc_A0),ncol(lc_A0),nLags)
+      dimAplus <- c(nrow(lc_A0),ncol(lc_A0),n_lags)
       Aplus <- matrix(x[-(1:(sum(lc_A0) + sum(lc_lmd)))],(nrow(lc_A0))^2,nrow(lc_A0))
 
       A <- matrix(0,nrow(lc_A0),ncol(lc_A0))
@@ -1830,7 +1860,7 @@ IrRun2 <-
 
     } else { ## needs to be calculated
 
-      mlmodel <- bvarwrap5(x, dat = dat_ts, lc_A0 = lc_A0, lc_lmd = lc_lmd, oweights = oweights, verbose = TRUE, nLags = nLags, ...)
+      mlmodel <- bvarwrap5(x, dat = dat_ts, lc_A0 = lc_A0, lc_lmd = lc_lmd, oweights = oweights, verbose = TRUE, n_lags = n_lags, ...)
 
       lh <- mlmodel$lh
 
@@ -1840,9 +1870,9 @@ IrRun2 <-
       u <- mlmodel$vout$var$u
       xx <- mlmodel$vout$var$xx
       nEq <- dim(xx)[3]
-      nLags <- dim(Aplus)[3]
+      n_lags <- dim(Aplus)[3]
       xxi <- list(nEq)
-      nX <- nEq * nLags * nEq + nEq
+      nX <- nEq * n_lags * nEq + nEq
       ##arraySigma <- array(0, dim = c(nX, nX, nEq))
       ##xxi = solve(xx[,,1])
       for (iEq in (1:dim(xx)[3])){
@@ -1872,11 +1902,11 @@ IrRun2 <-
 
       ##just to make sure, this is the postdraw() style implementation
       sndraws <- matrix(rnorm(nDraws), c(nDraws, 1))
-      matAplus <- t(matrix(Aplus, nEq, nEq * nLags))
+      matAplus <- t(matrix(Aplus, nEq, nEq * n_lags))
       #### Aplusdraws <- t(chol(Sigma)) %*% sndraws
       Aplusdraws <- MASS::mvrnorm(1,rep(0,dim(Sigma)[1]),Sigma) #### new method?
-      Aplusnoise <- matrix(Aplusdraws, c(nEq * nLags + 1, nEq)) ##i.e., the matrix of noise that I am adding to the posterior mean/mode
-      Aplus  <- matAplus + Aplusnoise[1:(nEq*nLags),] ##ignoring the constant, which is last row
+      Aplusnoise <- matrix(Aplusdraws, c(nEq * n_lags + 1, nEq)) ##i.e., the matrix of noise that I am adding to the posterior mean/mode
+      Aplus  <- matAplus + Aplusnoise[1:(nEq*n_lags),] ##ignoring the constant, which is last row
 
       ##cleaning pointers, etc.
       A <- mlmodel$A
@@ -1908,7 +1938,7 @@ IrRun2 <-
       By <- array(0, dim = dimAplus)
       Ainv <- solve(A)
       smat <- Ainv %*% diag(sqrt(lambda[,iLambda]))
-      for (iLag in (1:nLags)) {
+      for (iLag in (1:n_lags)) {
         By[,,iLag] <- Ainv %*% Aplus[,,iLag]
       }
 
@@ -2041,6 +2071,21 @@ logmean <-
   }
 
 
+#' Main wrapper function for drawing impulse responses
+#'
+#' @param xout A0 and Lambda draws in matrix form
+#' @param model
+#' @param rootcheck if TRUE, will check if roots are stable
+#' @param lrange which variance regimes you want IR for. The IR are all the same up to scale
+#' @param cores number of cores to use for mclapply. This is easily parallelized, so use many!
+#' @param oweights draws of delta_it
+#' @param aplus draws of A+. Code will run a lot faster if you specify this
+#' @param nStep number of steps of impulse responses
+#' @param hparam
+#'
+#' @return list with element ir, the impulse responses [nvar x nshock x nperiod x nregime x ndraws], plus other stuff which is less useful (mainly related to orderings/permutations)
+#' @export
+#'
 McmcIr <-
   function(xout, model, rootcheck = FALSE, lrange = 1:6, cores = 8,
            oweights = NULL,
@@ -2123,13 +2168,20 @@ McmcIr <-
     listXout <- lapply(1:nX, function(iRow){xout[iRow,]})
 
     listIrtrials <- parallel::mclapply(listXout, IrRun2, model$A,
-                                       model$lmd, model$dat_ts, model$lcA,
-                                       model$lc_lmd, nLags = model$nLags,
+                                       model$lmd, model$dat_ts,
+                                       # This was formerly model$lcA, which under R shorthand
+                                       # rules would have completed as the actual model$lcA0,
+                                       # now renamed to model$lc_A0.
+                                       # Possibly just an earlier error, Check for correctness?
+                                       model$lc_A0,
+                                       model$lc_lmd, n_lags = model$n_lags,
                                        owflag = owflag, aflag = aflag,
                                        lmdblock = model$lmdblock,
                                        hparam = hparam,
                                        breaks_pos = model$breaks_pos, prior_params = model$prior_params,
-                                       lmdPrior = model$lmdPrior, rootcheck = rootcheck,
+                                       # lmdPrior isn't used anymore,
+                                       # lmdPrior = model$lmdPrior,
+                                       rootcheck = rootcheck,
                                        lrange = lrange, nStep = nStep, mc.cores = cores)
 
     ##save(listIrtrials, file = 'rawIR.Rdata')
@@ -2324,6 +2376,21 @@ normAlmd <- function(Aml, lmdml, A, lmd) {
 }
 
 
+#' Title forecast plotting
+#'
+#' @param fcout forecasting results
+#' @param ydata
+#' @param dateseq
+#' @param vnames
+#' @param fulldates
+#' @param ymat
+#' @param filename
+#' @param cushion
+#'
+#' @return
+#' @export
+#'
+#' @examples
 plotfc <- function(fcout, ydata, dateseq,
                    vnames, fulldates,
                    ymat = c(4.35,4.70,

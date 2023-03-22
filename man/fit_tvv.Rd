@@ -21,9 +21,9 @@ fit_tvv(
   verbose = FALSE,
   seed_model = NULL,
   n_step = 60,
+  maxit = 500,
   extracheck = TRUE,
-  cores = 1,
-  n_varscores = 1,
+  n_cores = 1,
   seed_x = NULL,
   lmdPrior = FALSE,
   mn_start = 1,
@@ -79,7 +79,11 @@ which a first iteration x vector can be extracted intended usage: if you
 tweak the prior a bit, the mode will be close to old mode downside:
 estiamte of the inverse hessian from optimization will be poor}
 
-\item{cores}{Length-1 Integer (or integer-like numeric). Number of cores used for parallelization}
+\item{maxit}{Integer or integer-like numeric.  Maximum number of iterations.}
+
+\item{n_cores}{Length-1 Integer (or integer-like numeric). Number of cores used for parallelization}
+
+\item{noLmd}{}
 }
 \value{
 If \code{verbose = TRUE}: list output of the optimization routine (in
