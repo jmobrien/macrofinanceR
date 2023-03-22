@@ -92,103 +92,100 @@ fit_tvv <-
 
   # Data prep (previously dataprep() function) ----
 
-    ## Get date variable ----
+    ## Date variable ----
     time_q <- rlang::enquo(time_var)
     time_pos <- tidyselect::eval_select(time_q, dat)
     time_orig <- dat[[time_pos]]
 
-    ## Make data subset ----
-    if(!missing(vars)){
-      vars_q <- rlang::enquo(vars)
-      vars_pos <- tidyselect::eval_select(vars_q, dat)
-      dat_y_df <- dat[vars_pos]
+    ## Data subset ----
+    if(!missing(y_vars)){
+      y_vars_q <- rlang::enquo(y_vars)
+      y_vars_pos <- tidyselect::eval_select(y_vars_q, dat)
+      y_dat_df <- dat[y_vars_pos]
     } else {
       # if no selection just remove the date variable:
-      dat_y_df <- dat[-date_pos]
+      y_dat_df <- dat[-time_pos]
     }
 
     ## Log transforms ----
     if(!missing(vars_log)){
-      log_q <- rlang::enquo(vars_log)
+      vars_log_q <- rlang::enquo(vars_log)
       # NB This works on the already subsetted data, so positions match:
-      log_pos <- tidyselect::eval_select(log_q, dat_y_df)
-      dat_y_df[log_pos] <- log(dat_y_df[log_pos]) # needs checks for introduction of NA's
+      vars_log_pos <- tidyselect::eval_select(vars_log_q, y_dat_df)
+      y_dat_df[vars_log_pos] <- log(y_dat_df[vars_log_pos]) # needs checks for introduction of NA's
 
       # Names for output later:
-      log_vars <- names(log_pos)
+      vars <- names(vars_log_pos)
     } else {
-      log_vars <- NULL
+      vars_log_names <- NULL
     }
 
     ## Start/end dates----
 
     if(!missing(startdate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      begin_pos <- which(dates_orig == startdate)[1]
+      begin_pos <- which(time_orig == startdate)[1]
     } else {
-      begin_pos <- which(complete.cases(dat_y_df))[1]
+      begin_pos <- which(complete.cases(y_dat_df))[1]
     }
 
     if(!missing(enddate)){
       # Needs checks - no duplicates, matches, compatible types, etc.
-      end_pos <- which(dates_orig == enddate)[1]
+      end_pos <- which(time_orig == enddate)[1]
     } else {
-      end_pos <- length(dates_orig)
+      end_pos <- length(time_orig)
     }
 
+
+    ## MAIN DATA ----
     # Slice down to just the time-range specified:
-    dat_y_df <- dat_y_df[begin_pos:end_pos,]
-    time <- times_orig[begin_pos:end_pos]
-    ## Time dummy codes (inactive) ----
+    y_dat_df <- y_dat_df[begin_pos:end_pos,]
+    time <- time_orig[begin_pos:end_pos]
 
-    ## Breaks for periods ----
+    # Construct timeseries
+    y_dat <- ts(y_dat_df)
 
-    ## Index of breaks position based on breaks date input (formerly breaks_pos):
+    ## Time dummies (inactive) ----
+    ## Periods ----
+
+    ## Index of breaks position based on breaks date input (formerly Tsigbrk):
     ## JMO - needs checks:
-    breaks_pos <- which(dates %in% period_breaks)
+    breaks_pos <- which(time %in% period_breaks)
 
-    ## MAIN DATA - construct timeseries ----
-    dat_y_ts <- ts(dat_y_df)
+
+
+    ## Data characteristics ----
+
+    # Number and names of variables in Y matrix:
+    y_n_vars <- length(y_dat_df)
+    y_names <- names(y_dat_df)
+    # Observations, total and effective (less # lags):
+    n_obs <- nrow(y_dat_df)
+    n_obs_eff <- nrow(y_dat_df) - n_lags
+    # count of periods:
+    n_periods <- length(breaks_pos) + 1
+    # Lags:
+    # n_lags = n_lags
 
 
   # Initial optimization params ----
 
-    # Default A0 matrix if needed:
-    if (missing(lc_A0)) {
-      ##lower triangular default structure:
-      lc_A0 <- matrix(FALSE, nrow = n_vars, ncol = n_vars)
-      lc_A0[lower.tri(lc_A0)] <- TRUE
-    }
+  # Default A0 matrix if needed:
+  if (missing(lc_A0)) {
+    ##lower triangular default structure:
+    lc_A0 <- matrix(FALSE, nrow = n_vars, ncol = n_vars)
+    lc_A0[lower.tri(lc_A0)] <- TRUE
+  }
 
 
+  # Prior params (formerly pparams()) ----
 
-  # Construct unified model object ----
-    tvv_mod <-
-      list(
-        # Y variables:
-        y = dat_y_ts,
-        y_n_vars = length(dat_y_df),
-        y_names = names(dat_y_df),
-        # Time record varaiable:
-        time = time,
-        # Observations, total and effective (less # lags):
-        n_obs = nrow(dat_y_df),
-        n_obs_eff = nrow(dat_y_df) - n_lags,
-        # Lags:
-        n_lags = n_lags,
+    ## cos ----
+    # JMO - need to review this as a check:
+    ## cos_prior just passes through
+    ## specify mn or cos, probably not both
 
-        breaks_pos = breaks_pos
-      )
-
-    ## Key data aspects
-
-  # Setting up prior parameters (formerly pparams()) ----
-
-    # JMO - previously unaddressed arguments in pparams (add to fit_tvv() args?)
-    a_diag <- 1
-    ur_lambda <- 5
-    ur_mu <- 1
-
+    ## mn ----
     # JMO - Needs better checks for both mn_decay and mn_tight
     if (!is.null(mn_tight)){
       #### if mn prior is specified
@@ -197,35 +194,35 @@ fit_tvv <-
       mn_prior <- NULL #### no mn_prior
     }
 
-    # JMO - need to review this as a check:
-    ## cos_prior just passes through
-    ## specify one or the other, probably not both
-
+    ## v ----
     ## JMO - not clear what this is all about, review:
     ##these options are grandfathered in, from a time before we thought it was necessary
     ##to tweak v_prior. Else v_prior is just specified as a vector
-    ##Could raise an error if length v_prior != n_varss
+    ##Could raise an error if length v_prior != n_vars
     if (length(v_prior) == 1 && v_prior == 0){
       v_prior_sig <- rep(.01, n_vars)
     } else {
-      ##if full v_prior is providedL:
+      ##if full v_prior is provided:
       v_prior_sig <- v_prior
     }
-
     # Add variable names:
     names(v_prior_sig) <- var_names
-
-    # Build v_prior
+    # set v_prior as list (JMO - rename v_prior arg for clarity?)
     v_prior <- list(sig = v_prior_sig, w = 0)
 
-    # asig, asd,
+    ## a ----
     a_sig <- 2
     a_sd <- outer(v_prior$sig, 1/v_prior$sig)
+    # JMO - previously unaddressed arguments in pparams (add to fit_tvv() args?)
+    a_diag <- 1
 
-    # ur_prior
+    ## ur ----
+    # JMO - previously unaddressed arguments in pparams (add to fit_tvv() args?)
+    ur_lambda <- 5
+    ur_mu <- 1
     ur_prior <- list(lambda = ur_lambda, mu = ur_mu)
 
-    # Construct list of params (might drop later unless pparam reintroduced):
+    ## param list----
     prior_params <-
       list(
         a_sig = a_sig,
@@ -238,19 +235,22 @@ fit_tvv <-
         v_prior = v_prior
       )
 
-  # Build model seeds ----
+  # Seeds ----
 
+    ## Initialize:
     seeds <- list()
 
     ## Use previous output of routine
     if (!is.null(seed_model)){
 
-      ##program will re-apply zero restrictions as appropriate, but number of variables
-      ##must be correct
+      ## will re-apply zero restrictions as appropriate,
+      ## but number of variables must be correct
 
       seeds$A <- seed_model$A
       seeds$lmd <- seed_model$lambda
 
+
+      ## Replace this with a check: breaks either missing or match # of regimes
       seeds$n_regimes <-
         seed_model$lambda |>
         ncol()
@@ -264,16 +264,17 @@ fit_tvv <-
       if (any(hparam_nl > 0)){
         ## apply the nonlinear transformation via helper function:
         dat_seed <-
-          transform_nl(tvv_mod$y, nlt)$data
+          transform_nl(y_dat, nlt)$data
       } else{
-        dat_seed <- tvv_mod$y
+        dat_seed <-
+          y_dat
       }
 
       ## JMO - needs review?
       ## Hack to deal with dimensionality problem
 
       if (
-        (tvv_mod$n_lags * tvv_mod$n_vars) > (tvv_mod$n_obs - tvv_mod$n_lags)
+        (n_lags * y_n_vars) > (n_obs - n_lags)
       ) {
         n_lags_rf <- 4 ## crude
       } else {
@@ -297,14 +298,14 @@ fit_tvv <-
         chol() |>
         t()
 
-      seed$A <- solve(temp_A_inv)
-      seeds$lmd <- matrix(1, tvv_mod$y_n_vars, seeds$n_regimes)
-      seeds$regimes <- c(0, tvv_mod$breaks_pos - n_lags_rf, tvv_mod$n_obs)
+      seeds$A <- solve(temp_A_inv)
+      seeds$regimes <- c(0, breaks_pos - n_lags_rf, n_obs)
       seeds$n_regimes <- length(seeds$regimes) - 1
+      seeds$lmd <- matrix(1, y_n_vars, seeds$n_regimes)
 
 
-      seed$A[!tvv_mod$lc_A0] <- 0 ##restrictions
-      seed$A[upper.tri(seed$A)] <- 0 ##avoiding floating point junk; unclear if important
+      seeds$A[!lc_A0] <- 0 ##restrictions
+      seeds$A[upper.tri(seeds$A)] <- 0 ##avoiding floating point junk; unclear if important
 
       seeds$A_inv <- solve(seeds$A)
       seeds$A_inv[upper.tri(seeds$A_inv)] <- 0
@@ -315,11 +316,11 @@ fit_tvv <-
     # JMO - this seems to overwrite the seed model above?
 
     ##like lc_A0, tells program what values to fill from x
-    seeds$n_regimes <- length(tvv_mod$period_breaks) + 1
-    seeds$lc_lmd <- matrix(TRUE, nrow = tvv_mod$n_vars, ncol = seeds$n_regimes)
+    seeds$n_regimes <- length(period_breaks) + 1
+    seeds$lc_lmd <- matrix(TRUE, nrow = n_y_vars, ncol = seeds$n_regimes)
     seeds$lc_lmd[,seeds$n_regimes] <- FALSE
 
-    if (!is.null(tvv_mod$lmd_block)){
+    if (!is.null(lmd_block)){
       ##generate matrix that tells optimizer what to fill in lmd
       n_blocks <- dim(lmd_block)[3]
 
@@ -470,7 +471,7 @@ fit_tvv <-
         x0 = seed_x,
         H0 = seed_H,
         nit = maxit,
-        dat = dat_y_ts,
+        dat = y_dat,
         lc_A0 = lc_A0, lc_lmd = lc_lmd,
         lmd_block = lmd_block,
         breaks_pos = breaks_pos,
@@ -514,7 +515,7 @@ fit_tvv <-
           H0 = seed_H,
           nit = maxit,
           n_cores = n_cores,
-          dat = dat_y_ts,
+          dat = y_dat,
           lc_A0 = lc_A0,
           lc_lmd = lc_lmd,
           lmd_block = lmd_block,
@@ -551,7 +552,7 @@ fit_tvv <-
     mlmodel <-
       lhfcn(
         x, verbose = TRUE,
-        dat = dat_y_ts,
+        dat = y_dat,
         n_lags = n_lags,
         lc_A0 = lc_A0, lmd_block = lmd_block,
         lc_lmd = lc_lmd,
@@ -606,8 +607,8 @@ fit_tvv <-
       list(A = A, lmd = lmd, lambda = lambda, relLambda = relLambda,
            vout = vout, ir = ir, x = x, breaks_pos = breaks_pos,
            startdate = startdate, enddate = enddate, lc_lmd = lc_lmd,
-           lc_A0 = lc_A0, log_vars = log_vars, prior_params = prior_params,
-           y = dat_y_ts, lmd_block = lmd_block,
+           lc_A0 = lc_A0, vars_log_names = vars_log_names, prior_params = prior_params,
+           y = y_dat, lmd_block = lmd_block,
            different = different,
            extracheck = extracheck, term1 = term1,
            term2 = term2, n_lags = n_lags, lh = lh)
