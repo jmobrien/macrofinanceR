@@ -310,7 +310,7 @@ bvarwrap_tvA <-
       if (!verbose){
         return(lh) #### dont need anything else
       } else {
-        return(list(lh <- lh))
+        return(list(lh = lh))
       }
 
 
@@ -323,7 +323,7 @@ bvarwrap_tvA <-
       if (!verbose){
         return(lh) #### dont need anything else
       } else {
-        return(list(lh <- lh))
+        return(list(lh = lh))
       }
 
 
@@ -336,7 +336,7 @@ bvarwrap_tvA <-
       if (!verbose){
         return(lh) #### dont need anything else
       } else {
-        return(list(lh <- lh))
+        return(list(lh = lh))
       }
 
     } else { #### proceed normally
@@ -637,7 +637,7 @@ bvarwrap5 <-
       if (!verbose){
         return(lh) #### dont need anything else
       } else {
-        return(list(lh <- lh))
+        return(list(lh = lh))
       }
 
 
