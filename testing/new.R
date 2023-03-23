@@ -101,10 +101,9 @@ disperse = TRUE ## if TRUE, disperse the starting point using inverse hessian as
 ## in parallel (bearing in mind whether R is using a separate random seed each time)
 
 ## How long to run MCMC Chain
-## This is for "proof of concept": Of course increase this for a proper sample!
-ndraw = 1000 ## total draws to record
+ndraw = 5000 ## total draws to record (JMO - 5000, runs pretty quickly)
 nsep = 1 ## number of draws per recorded draws
-## To clarify futher: you have done nsep * ndraw MCMC draws, but only recorded ndraw of them.
+## To clarify further: you have done nsep * ndraw MCMC draws, but only recorded ndraw of them.
 
 savespots = seq(min(100,ndraw),ndraw,length.out=10) ## draws at which to save output
 ## NOTE: 100 draws is just for testing the code! You want many thousands to get a reliable
@@ -113,12 +112,24 @@ savespots = seq(min(100,ndraw),ndraw,length.out=10) ## draws at which to save ou
 
 filename = 'testing/new_output/mcmc_out' ## filename in which to save output
 
+# If needed, reload data (optout) from CALCULATE_POSTERIOR_DRAWS above:
+load('testing/new_output/gmode.rda')
+new_df <-
+  read_csv("~/Freelancing/2023_02_replication_analyses/use_case_data.csv")
+
+#JMO - variables added for improved convenience/code clarity below:
+n_vars <- ncol(optout$dat_ts)
+n_obs <- nrow(optout$dat_ts)
+n_lags <- optout$n_lags
+regime_breaks <- optout$breaks_pos
+datevar <- new_df$time
+# string names for plotting:
+var_names = c("FED", "LGDP", "LPCE", "VFCI")
 
 ## Set MCMC Starting point #################
 
-
-# If needed, reload data from CALCULATE_POSTERIOR_DRAWS above:
-load('testing/new_output/gmode.rda')
+# JMO - Set a working random seed for replicability (should prevent #3 below from occurring):
+set.seed(1234)
 
 if (disperse){
   optout$x = optout$x + mvrnorm(n = 1, mu = rep(0,length(optout$x)), Sigma = optout$opt$H)
@@ -126,6 +137,22 @@ if (disperse){
 
 
 ## Do Gibbs Sampling  ###################
+
+
+# JMO - (1) See below, section my_choice == 't'
+# Not sure where code for the calculation of this df is,
+# though for description see p.1852 footnote 11, as well as  appendix
+
+
+
+# JMO - (2) you will likely see this warning:
+#   In log(lmd) : NaNs produced
+# This seems to be related to bad draws, but which are otherwise being properly excluded
+
+# JMO - (3) if you get this error:
+#   (Error in lhout[idraw] <- gout$lhout : replacement has length zero)
+#  Then reload the optout from file above, re-run the dispersion code just above,
+#  and re-run. Still not sure what this is, but saw it with the original data as well.
 
 
 if (my_choice == 'gaussian'){
@@ -185,13 +212,20 @@ if (my_choice == 'gaussian'){
   )
 }
 
+# (JMO - had a 5k run where after 1k estimates everything was zeroed out.
+# I think something's pulling in a global variable or something that it shouldn't
+# but I haven't tracked it down yet)
+
 
 ## Checking the MCMC chain ######################
 
 
+
 # number of transitions in /recorded/ draws
 ntrans = sum(mcmc_output$tout)
-# a "sample estimate" of the transition probability (JMO - may be high?)
+# a "sample estimate" of the transition probability
+
+# JMO - seems high?
 accept = ntrans/ndraw
 # .2 to .3 is a reasonable range to shoot for
 ## See appendix 3 for more on convergence diagnostics. the CODA package is also very useful
@@ -201,25 +235,29 @@ accept = ntrans/ndraw
 ## Table of relative variances ####################
 
 
+# construct lambda matrix:
+
+lambda_dim <-
+  c(4, # of variables
+    7, # of regimes
+    ndraw) # of draws
+
 lambda <-
-  array(0,
-        c(4, # of variables
-          7, # of regimes
-          ndraw # of draws
-        ))
+  array(0, lambda_dim)
 
 
-# JMO - mcmc_output$xout is vector whose elements combining these estimates:
+# JMO - mcmc_output$xout is vector whose elements combine these estimates in sequence:
   # n_var * n_var elements (here, 4 * 4 = 16)
   # n_var * (n_regimes - 1) (here, 4 * 6 = 24)
   # total here of 40
 
 # Write gibbs sampling results for regimes into respective spots in the lambda array
-lambda[,1:6,] = mcmc_output$xout[17:40,]
-# Get normalized variance for final regime column set in array:
-lambda[,7,] = 7 - apply(lambda[,1:6,], c(1,3), sum) # retrieving the normalized variance
+lambda[,1:6,] <- mcmc_output$xout[17:40,]
 
-lambda_median = apply(lambda, c(1,2), median); # taking the median across draws
+# Get normalized variance for final regime column set in array:
+lambda[,7,] <- 7 - apply(lambda[,1:6,], c(1,3), sum) # retrieving the normalized variance
+
+lambda_median <- apply(lambda, c(1,2), median); # taking the median across draws
 # can do other posterior stats, credible sets, etc.
 
 
@@ -230,13 +268,6 @@ e = mcmc_output$eout # Residuals up to scaling by Lambda
 
 ## Deriving right scaling
 
-#JMO - convenience additions:
-n_vars <- ncol(optout$dat_ts)
-n_obs <- nrow(optout$dat_ts)
-n_lags <- optout$n_lags
-regime_breaks <- optout$breaks_pos
-datevar <- new_df$time
-
 lmdndx = rep(1:7, times = diff(c(regime_breaks, n_obs)))
 # JMO - don't fully understand this yet, appears to be scaling all but the first vars
 lambda_scaling = sqrt(lambda[,lmdndx[(n_lags + 1):n_obs],])
@@ -246,14 +277,20 @@ e = e * lambda_scaling
 ## Median
 e_median = apply(e, c(1,2), median)
 
-## Attaching date sequences (JMO - remove 3 lags from beginning of date var)
+## Attaching date sequences
+# (JMO - since n_lags == 3, removes first 3 entries from date var)
+
 dseq = datevar[4:length(datevar)]
 
-topN = 4
+# JMO - Total number of shocks from estimation:
 nShocks = dim(e)[2]
 
+# JMO - how many we want for the ranked table below
+#. (all 4 of them, but was 4 in the original paper as well, despite 10 shocks)
+topN = 4
+
+## Making table of biggest shocks:
 big_shocks = list()
-## Making table
 for (i in 1:nShocks){
   ## Rank shocks
   myOrder = order(-abs(e_median[,i]))[1:topN]
@@ -263,45 +300,69 @@ for (i in 1:nShocks){
   big_shocks[[i]] = shock_df
 }
 
+# Review:
+big_shocks
 
 
 ## Get Impulse Responses    ##########################
 
-thin = seq(1,dim(mcmc_output$xout)[2],by=1) ## if you would prefer to do IR for a subsample
+## JMO - thin here contains everything if you would prefer to do IR for a subsample, adjust this:
+thin <-
+  seq(1,dim(mcmc_output$xout)[2],by=1)
 
 ## to scale ir to an "average" period, we set the variances in the first period to 1
-mcmc_output$xout[17:20,] = 1
+mcmc_output$xout[17:20,] <- 1
 
-ir = McmcIr(t(mcmc_output$xout)[thin,],
-            optout, ## this is the posterior mode file. as written, the function extracts the names of the variables and a few other things from here (not actually used in the calculation)
-            lrange = 1, ## which variance regimes ("lambdas") for which to report IR. this was useful when I was graphing the IR separately for each regime --- if the goal is to look at an "average" regime with the new rescaling, there's no reason not to just 1
-            cores = ncore, ## this will parallelize the sampling of the reduced form coefficients with n cores. If you're already parallelizing the main job, it's probably smarter to use one core here (calculating the IR takes relatively little time either way)
-            ##oweights = mcmcout$dout ## these are the extra weights (the variance shock draws) that you need to take account of to get the correct reduced form residuals
-            aplus = mcmc_output$aout[,,thin]
-)
+# JMO - comes out as a list right now, but we just want the array element
+ir_list <-
+  McmcIr(t(mcmc_output$xout)[thin,],
+         optout, ## this is the posterior mode file. as written, the function extracts the names of the variables and a few other things from here (not actually used in the calculation)
+         lrange = 1, ## which variance regimes ("lambdas") for which to report IR. this was useful when I was graphing the IR separately for each regime --- if the goal is to look at an "average" regime with the new rescaling, there's no reason not to just 1
+         cores = ncore, ## this will parallelize the sampling of the reduced form coefficients with n cores. If you're already parallelizing the main job, it's probably smarter to use one core here (calculating the IR takes relatively little time either way)
+         ##oweights = mcmcout$dout ## these are the extra weights (the variance shock draws) that you need to take account of to get the correct reduced form residuals
+         aplus = mcmc_output$aout[,,thin]
+  )
 
-## warning: this takes up a lot of space on your hard drive!
-save(ir,file = paste0(filename,'_ir.rda'))
+## warning: this takes up a lot of space on your hard drive! (JMO - not that bad)
+save(ir_list,file = paste0(filename,'_ir.rda'))
+
 
 
 ## Plot all IR  ##########################
 
-vnames = c("FED", "LGDP", "LPCE", "VFCI")
+# JMO - looking at this:
+ir_list$ir |> dim()
+# dimensions are 4 x 4 x 60 x 1 x 5000, i.e.:
+# nvars x nvars
+# x (# steps, I think?)
+# x regimes used in estimation[i.e., length(lrange)]
+# x ndraws
+
+# JMO - pull out the array needed for plotting
+# (dimensions 1,2,3 & 5, dropping lrange as it's irrelevant here:)
+ir <- ir_list$ir[,,,1,]
+
+
+# Collapse across all 1000 draws, taking the median value:
+
+
+ir_plotdat <-apply(ir,c(1:3),median)
+
 
 impulseplots(
-  ir = apply(ir$ir[,,,1,],c(1:3),median),
-  irdraws = ir$ir[,,,1,],
+  ir = ir_plotdat, ## array of impulse response objects, nvar x nshock x nperiod
+  irdraws = ir, ## nvar x nshock x nperiod x ndraw
   conf = c(0.68,0.90), ## posterior uncertainty bands
-  shocknames = as.character(1:10),
-  filename = paste0(filename,'_irplot'),
-  varnames = vnames,
+  shocknames = as.character(1:4), # JMO - Shocks named in paper based on interpretation, left as numeric here
+  filename = paste(filename,'_irplot',sep=''),
+  varnames = var_names, # see above where this was set up
   width = 6, height = 8)
-
 
 
 ## Get MDD #############################
 
-draw_seq = 1:200                        # what draws to use
+draw_seq = 1:5000                       # what draws to use
+
 mout <-
   get_mdd(
     x = t(mcmc_output$x[,draw_seq]),  # draws
@@ -311,6 +372,196 @@ mout <-
 )
 ## OUTPUT: with and without correction for this GD truncation
 
+# PLOT_IMPULSE_RESPONSE (Figs 1-8) ---------------------------------------------------
+
+
+## Plots a few different permutations of impulse responses
+## All output is saved as pdf files in the plots/ subdiectory
+
+## Karthik Sastry
+## January 2018
+
+
+## Load in an impulse response file ########################
+
+
+# JMO - if you want to re-load what's above:
+draws_filename = 'testing/new_output/mcmc_out_ir.rda'
+load(draws_filename)
+ir <- ir_list$ir[,,,1,]   # easier to read code
+ir_plotdat <- apply(ir,c(1:3),median) # Collapse across all draws, taking the median value:
+var_names = c("FED", "LGDP", "LPCE", "VFCI") ## Names of all the variables
+
+# stem for all the titles:
+irname = 'testing/new_output/model'
+
+
+
+
+## Plot all IR  #############################
+
+
+## Duplicates the same action at the end of get_posterior_draws.R
+## (JMO - duplicate commented out)
+#
+# impulseplots(
+#   ir = ir_plotdat,
+#   irdraws = ir,
+#   conf = c(0.68,0.90), ## posterior uncertainty bands
+#   shocknames = as.character(1:4),
+#   filename = paste(irname,'_irplot',sep=''),
+#   varnames = var_names,
+#   width = 6, height = 8)
+
+
+
+## 5x5 Blocks (Figures 1-4)  ##########################
+
+# JMO - only one 4x4 block here, making it the same as the one just above
+#   commented out again, but left in for illustrative purposes:
+
+# blocks = list()
+# blocks[[1]] = list(x = 1:4,y=1:4)
+# # blocks[[2]] = list(x = 1:5,y=6:10)
+# # blocks[[3]] = list(x = 6:10,y=1:5)
+# # blocks[[4]] = list(x = 6:10,y=6:10)
+#
+# impulseplots(
+#   ir = ir_plotdat,
+#   irdraws = ir,
+#   shocknames = as.character(1:4),
+#   blocks = blocks,
+#   filename = paste(irname,'_block',sep=''),
+#   varnames = var_names,
+#   width = 6, height = 6)
+
+
+## Monetary Policy Shock #########################
+
+
+# blocks = list(list(x=c(1:5),y=6))
+# blocks[[2]] = list(x=c(6:10),y=6)
+#
+# impulseplots(
+#   ir = ir_plotdat,
+#   irdraws = ir,
+#   shocknames = NULL,
+#   blocks = blocks,
+#   filename = paste(irname,'_mopo',sep=''),
+#   varnames = var_names,
+#   width = 3, height = 6)
+
+
+## Credit Shocks  ###########################
+
+
+# blocks = list(list(x=c(1:5),y=c(3:4)))
+# blocks[[2]] = list(x=c(6:10),y=c(3:4))
+#
+# impulseplots(
+#   ir = ir_plotdat,
+#   irdraws = ir,
+#   shocknames = as.character(1:4),
+#   blocks = blocks,
+#   filename = paste(irname,'_credit',sep=''),
+#   varnames = var_names,
+#   width = 3, height = 6)
+
+
+## Spread Shocks ###########################
+
+
+# blocks = list(list(x=c(1:5),y=c(9:10)))
+# blocks[[2]] = list(x=c(6:10),y=c(9:10))
+# impulseplots(
+#   ir = ir_plotdat,
+#   irdraws = ir,
+#   shocknames = as.character(1:4),
+#   blocks = blocks,
+#   filename = paste(irname,'_spread',sep=''),
+#   varnames = var_names,
+#   width = 3, height = 6)
+
+
+## Credit + Monetary Shocks ###########################
+
+## JMO - not clear if relevant to your interpretation, so commented out
+##  should be able to use the above for filling out if you need:
+
+# ir_small = ir[,c(3,4,6),,]
+# ndraw = dim(ir_small)[4]
+#
+# ## allocating space
+# irmix = array(0,c(10,5,60,ndraw)) ## the mixed impulse response
+#
+# ## Constructing the IR mix
+# nperiod = 60
+#
+# for (iperiod in 1:nperiod){
+#   raw_response = ir_small[,1:2,iperiod,] + irmix[,4:5,iperiod,] ## without compensating policy
+#
+#   ## for shock 3
+#   policy_weight = -raw_response[6,1,] / ir_small[6,3,1,] ## amount of monetary policy shock to add
+#   irmix[,4,iperiod,] = raw_response[,1,]
+#   irmix[,4,iperiod:nperiod,] = irmix[,4,iperiod:nperiod,] + rep(policy_weight,each=10 * (nperiod-iperiod+1)) * ir_small[,3,1:(nperiod-iperiod+1),]
+#
+#   ## for shock 4
+#   policy_weight = -raw_response[6,2,] / ir_small[6,3,1,] ## amount of monetary policy shock to add
+#   irmix[,5,iperiod,] = raw_response[,2,]
+#   irmix[,5,iperiod:nperiod,] = irmix[,5,iperiod:nperiod,] + rep(policy_weight,each=10 * (nperiod-iperiod+1)) * ir_small[,3,1:(nperiod-iperiod+1),]
+# }
+#
+# irmix[,1:3,,] = ir_small
+#
+# ## Plotting this
+#
+# sn = c('Shock 3 (HHC)','Shock 4 (BC)','MP','3 + MP','4 + MP')
+#
+# blocks = list()
+# blocks[[1]] = list(x = c(1:4,6),y=c(1,2,4,5))
+#
+# impulseplots(
+#   ir = apply(irmix,c(1:3),median),
+#   irdraws = irmix,
+#   shocknames = sn,
+#   blocks = blocks,
+#   filename = paste(irname,'_creditMP',sep=''),
+#   varnames = var_names,
+#   width = 6, height = 6)
+
+
+
+# JMO - STOPPED HERE FOR REWORK FOR NOW ----------
+
+## Variance decomposition ##########################
+
+
+vd = ir;
+
+for (iv in 1:dim(ir)[4]){
+  vd[,,,iv] = vdecomp(ir[,,,iv])
+}
+
+blocks = list(list(x=c(1:4),y=c(1:10)))
+
+## Portrait orientation
+## impulseplots(
+##     ir = apply(vd,c(1:3),median),
+##     irdraws = vd,
+##     shocknames = as.character(1:4),
+##     blocks = blocks,
+##     filename = paste(irname,'_vd_portrait',sep=''),
+##     varnames = var_names,
+##     width = 6, height = 3)
+
+impulseplots(
+  ir = apply(vd,c(1:3),median),
+  irdraws = vd,
+  shocknames = as.character(1:4),
+  blocks = blocks,
+  filename = paste(irname,'_vd',sep=''),
+  varnames = var_names,
+  width = 8, height = 5)
 
 # CALCULATE_FORECASTS ----------------------------------------------------------
 
@@ -439,193 +690,6 @@ fc_array = array(unlist(fc_out),
 save(fc_array,file = paste(filename,'_fc_array.Rdata',sep=''))
 
 
-# PLOT_IMPULSE_RESPONSE (Figs 1-8) ---------------------------------------------------
-
-
-## Plots a few different permutations of impulse responses
-## All output is saved as pdf files in the plots/ subdiectory
-
-## Karthik Sastry
-## January 2018
-
-
-## Load in an impulse response file ########################
-
-
-filename = 'testing/new_output/mcmc_out_ir.rda' # if you ran get_posterior_draws.R
-# filename = 'testing/new_output/replication_irf_draws.Rdata' # if you want to exactly replicate plots in the draft
-
-irname = 'testing/new_output/model'               # stem for all the titles
-
-load(filename)
-
-if (!is.null(names(ir))){
-  ir = ir$ir[,,,1,]                       # easier to read code
-}
-
-## Names of all the variables
-vnames = c("FED", "LGDP", "LPCE", "VFCI")
-
-
-
-
-## Plot all IR  #############################
-
-
-## Duplicates the same action at the end of get_posterior_draws.R
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  conf = c(0.68,0.90), ## posterior uncertainty bands
-  shocknames = as.character(1:10),
-  filename = paste(irname,'_irplot',sep=''),
-  varnames = vnames,
-  width = 6, height = 8)
-
-
-
-## 5x5 Blocks (Figures 1-4)  ##########################
-
-# only one 4x4 block here, making it the same as the one just above
-
-blocks = list()
-blocks[[1]] = list(x = 1:4,y=1:4)
-# blocks[[2]] = list(x = 1:5,y=6:10)
-# blocks[[3]] = list(x = 6:10,y=1:5)
-# blocks[[4]] = list(x = 6:10,y=6:10)
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_block',sep=''),
-  varnames = vnames,
-  width = 6, height = 6)
-
-
-## Monetary Policy Shock #########################
-
-
-blocks = list(list(x=c(1:5),y=6))
-blocks[[2]] = list(x=c(6:10),y=6)
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = NULL,
-  blocks = blocks,
-  filename = paste(irname,'_mopo',sep=''),
-  varnames = vnames,
-  width = 3, height = 6)
-
-
-## Credit Shocks  ###########################
-
-
-blocks = list(list(x=c(1:5),y=c(3:4)))
-blocks[[2]] = list(x=c(6:10),y=c(3:4))
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_credit',sep=''),
-  varnames = vnames,
-  width = 3, height = 6)
-
-
-## Spread Shocks ###########################
-
-
-blocks = list(list(x=c(1:5),y=c(9:10)))
-blocks[[2]] = list(x=c(6:10),y=c(9:10))
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_spread',sep=''),
-  varnames = vnames,
-  width = 3, height = 6)
-
-
-## Credit + Monetary Shocks ###########################
-
-ir_small = ir[,c(3,4,6),,]
-ndraw = dim(ir_small)[4]
-
-## allocating space
-irmix = array(0,c(10,5,60,ndraw)) ## the mixed impulse response
-
-## Constructing the IR mix
-nperiod = 60
-
-for (iperiod in 1:nperiod){
-  raw_response = ir_small[,1:2,iperiod,] + irmix[,4:5,iperiod,] ## without compensating policy
-
-  ## for shock 3
-  policy_weight = -raw_response[6,1,] / ir_small[6,3,1,] ## amount of monetary policy shock to add
-  irmix[,4,iperiod,] = raw_response[,1,]
-  irmix[,4,iperiod:nperiod,] = irmix[,4,iperiod:nperiod,] + rep(policy_weight,each=10 * (nperiod-iperiod+1)) * ir_small[,3,1:(nperiod-iperiod+1),]
-
-  ## for shock 4
-  policy_weight = -raw_response[6,2,] / ir_small[6,3,1,] ## amount of monetary policy shock to add
-  irmix[,5,iperiod,] = raw_response[,2,]
-  irmix[,5,iperiod:nperiod,] = irmix[,5,iperiod:nperiod,] + rep(policy_weight,each=10 * (nperiod-iperiod+1)) * ir_small[,3,1:(nperiod-iperiod+1),]
-}
-
-irmix[,1:3,,] = ir_small
-
-## Plotting this
-
-sn = c('Shock 3 (HHC)','Shock 4 (BC)','MP','3 + MP','4 + MP')
-
-blocks = list()
-blocks[[1]] = list(x = c(1:4,6),y=c(1,2,4,5))
-
-impulseplots(
-  ir = apply(irmix,c(1:3),median),
-  irdraws = irmix,
-  shocknames = sn,
-  blocks = blocks,
-  filename = paste(irname,'_creditMP',sep=''),
-  varnames = vnames,
-  width = 6, height = 6)
-
-
-
-## Variance decomposition ##########################
-
-
-vd = ir;
-
-for (iv in 1:dim(ir)[4]){
-  vd[,,,iv] = vdecomp(ir[,,,iv])
-}
-
-blocks = list(list(x=c(1:4),y=c(1:10)))
-
-## Portrait orientation
-## impulseplots(
-##     ir = apply(vd,c(1:3),median),
-##     irdraws = vd,
-##     shocknames = as.character(1:10),
-##     blocks = blocks,
-##     filename = paste(irname,'_vd_portrait',sep=''),
-##     varnames = vnames,
-##     width = 6, height = 3)
-
-impulseplots(
-  ir = apply(vd,c(1:3),median),
-  irdraws = vd,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_vd',sep=''),
-  varnames = vnames,
-  width = 8, height = 5)
 
 # PLOT_FORECASTS (Figs 9-13)----------------------------------------------------------
 
@@ -674,7 +738,6 @@ ydata = ydata[(ids[1] - padding[1]):(ids[length(ids)] + padding[2]),]
 fulldates = fulldates[(ids[1] - padding[1]):(ids[length(ids)] + padding[2])]
 
 
-vnames = c('IP','P','HHC','BC','M1','R','PCM','TS','GZ','ES') # short names
 
 
 
@@ -757,15 +820,6 @@ plotrmse(c(1979,10),
 ## January 2018
 
 
-rm(list = ls()) ## clear workspace
-
-## setwd('path/to/files')
-
-source('load_functions.R')
-load_functions() ## also loads packages
-
-
-
 ## Load in an impulse response file ############################
 
 
@@ -780,7 +834,7 @@ if (!is.null(names(ir))){
 }
 
 ## Names of all the variables
-vnames = c('IP','P','HHC','BC','M1','R','PCM','TS','GZ','ES')
+vnames = c("FED", "LGDP", "LPCE", "VFCI")
 
 
 
@@ -954,14 +1008,6 @@ impulseplots(
 
 ## Constructs epsilon_it and ranks by that
 
-rm(list = ls())                         # Clear workspace
-
-## setwd('path/to/files')
-
-source('load_functions.R')
-load_functions() ## also loads packages
-
-load('testing/new_output/replication_draws.Rdata')
 ndraw = dim(output$xout)[2]
 
 lambda = array(0,c(10,6,ndraw))
@@ -990,13 +1036,6 @@ print(lambda_median)
 
 
 ## Constructs epsilon_it and ranks by that
-
-rm(list = ls())                         # Clear workspace
-
-## setwd('path/to/files')
-
-source('load_functions.R')
-load_functions() ## also loads packages
 
 load('testing/new_output/replication_draws.Rdata')
 
@@ -1167,14 +1206,6 @@ print(mytab)
 
 ## Reproduces results in Section V
 ## Note that this requires that you have already made the posterior draws
-
-rm(list = ls()) ## clear workspace
-
-## setwd('path/to/files')
-
-source('load_functions.R')
-load_functions() ## also loads packages
-
 
 ## Set parameters #################################################
 

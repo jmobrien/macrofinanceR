@@ -2201,7 +2201,9 @@ McmcIr <-
       output[[iElement]] <- iObject
     }
 
-    output$ir <- array(output$ir, dim = c(length(vars), length(vars), 60, length(lrange), nTrials))
+    output$ir <-
+      # JMO - is this fixed 60 the nStep param, just held constant
+      array(output$ir, dim = c(length(vars), length(vars), 60, length(lrange), nTrials))
 
     if (inherits(xout, 'mcmc')){
       output$x <- coda::mcmc(t(output$x), thin = thin(xout))
