@@ -97,6 +97,26 @@ matrictint <-
   }
 
 
+#' Title
+#'
+#' @param ydata
+#' @param lags
+#' @param xdata
+#' @param const
+#' @param breaks
+#' @param lambda
+#' @param mu
+#' @param mnprior
+#' @param vprior
+#' @param train
+#' @param flat
+#' @param nonorm
+#' @param ic
+#'
+#' @return
+#' @export
+#'
+#' @examples
 mgnldnsty <-
   function(ydata,lags,xdata=NULL, const=TRUE, breaks=NULL,lambda=5,mu=1,mnprior=list(tight=3,decay=.5),
            vprior=list(sig=NULL,w=1),train=0,flat=FALSE,nonorm=FALSE,ic=NULL)
@@ -152,9 +172,9 @@ mgnldnsty <-
     } else {
       ybar <- ic
     }
-    vp <- varprior(nv,nx,lags,mnprior,vprior, urprior=list(lambda=lambda, mu=mu), ybar=ybar)
+    vp <- varprior(nv,nx,lags,mnprior,vprior, ur_prior=list(lambda=lambda, mu=mu), ybar=ybar)
     ## vp$: ydum,xdum,pbreaks
-    var <- rfvar3(ydata=rbind(ydata, vp$ydum), lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, Tobs, Tobs + vp$pbreaks), ncol=1),
+    var <- rfvar3(ydata=rbind(ydata, vp$ydum), n_lags=lags, xdata=rbind(xdata,vp$xdum), breaks=matrix(c(breaks, Tobs, Tobs + vp$pbreaks), ncol=1),
                   const=FALSE, lambda=NULL, mu=NULL, ic=ic) # const is FALSE in this call because ones alread put into xdata
     Tu <- dim(var$u)[1]
     if ( var$snglty > 0 ) error( var$snglty, " redundant columns in rhs matrix")
@@ -178,7 +198,7 @@ mgnldnsty <-
       ## non-null lambda, mu in call to varprior, not in rfvar3 call.
       ## varp <- rfvar3(ydata=rbind(ytrain, vp$ydum), lags=lags, xdata=rbind(xtrain, vp$xdum),
       ##               breaks=c(tbreaks, Tp+vp$pbreaks), lambda=lambda, mu=mu, const=FALSE, ic=ic)
-      varp <- rfvar3(ydata=rbind(ytrain, vp$ydum), lags=lags, xdata=rbind(xtrain, vp$xdum),
+      varp <- rfvar3(ydata=rbind(ytrain, vp$ydum), n_lags=lags, xdata=rbind(xtrain, vp$xdum),
                      breaks=c(tbreaks, Tp+vp$pbreaks), lambda=NULL, mu=NULL, const=FALSE, ic=ic)
       ## const is FALSE here because xdata already has a column of ones.
       if (varp$snglty > 0) {

@@ -5,21 +5,46 @@
 \title{generate rmse plots}
 \usage{
 plotrmse(
+  ...,
   sdate,
-  rmse1,
-  rmse2,
-  rmse3,
+  frequency = 12,
   filename,
   vname = rep(NULL, nv),
   ih = 1,
   height = 8,
   width = 6.5,
   diff = FALSE,
-  rshade = TRUE
+  rshade = TRUE,
+  rlist = c(1980, 1980 + 6/12, 1981 + 6/12, 1982 + 10/12, 1990 + 6/12, 1991 + 2/12, 2001
+    + 2/12, 2001 + 10/12, 2007 + 11/12, 2009 + 5/12),
+  colors = NULL
 )
 }
 \arguments{
-\item{rshade}{}
+\item{...}{rmse's to include, from getrmse()}
+
+\item{sdate}{start date for time series, as 2 element numeric: c(\link{time unit}, \link{time subunit in specified frequency})}
+
+\item{frequency}{how often time points are sampled per year (e.g. 12 for
+monthly data, 4 for quarterly data)}
+
+\item{filename}{file name to output pdf to}
+
+\item{vname}{names of variables to be plotted}
+
+\item{ih}{which horizon to plot?  Indicates position in getrmse()'s array output, not horizon length itself)}
+
+\item{height}{plot height}
+
+\item{width}{plot width}
+
+\item{diff}{if TRUE, calculate as differences}
+
+\item{rshade}{if TRUE, shade recession periods}
+
+\item{rlist}{numeric position (in years) of start/end points of recession periods}
+
+\item{colors}{what colors to use for each of the rmse's added?  Will generate from rainbow() if unspecified}
 }
 \description{
 generate rmse plots

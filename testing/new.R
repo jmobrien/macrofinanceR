@@ -4,12 +4,12 @@
 require(macrofinanceR)
 require(tidyverse)
 
-
 # CALCULATE_GAUSSIAN_MODE (new code analogous to this file) --------------------
 
 ## Load data ###################
 rm(list = ls()) ## clear workspace
 
+# Fill this out to the data:
 new_df <-
   read_csv("~/Freelancing/2023_02_replication_analyses/use_case_data.csv")
 
@@ -65,7 +65,7 @@ impulseplots(optout$ir[,,,1],
 save(optout, file = './testing/new_output/gmode.rda')
 
 # Reload for workshopping:
-# testdat <- readRDS(file = './testing/new_data/test_gmode.rds')
+# testdat <- readRDS(file = './data/test_gmode.rds')
 
 
 # CALCULATE_POSTERIOR_DRAWS ----------------------------------------------------
@@ -132,7 +132,8 @@ var_names = c("FED", "LGDP", "LPCE", "VFCI")
 set.seed(1234)
 
 if (disperse){
-  optout$x = optout$x + mvrnorm(n = 1, mu = rep(0,length(optout$x)), Sigma = optout$opt$H)
+  dispersion <- MASS::mvrnorm(n = 1, mu = rep(0,length(optout$x)), Sigma = optout$opt$H)
+  optout$x <- optout$x + dispersion
 }
 
 
@@ -247,9 +248,9 @@ lambda <-
 
 
 # JMO - mcmc_output$xout is vector whose elements combine these estimates in sequence:
-  # n_var * n_var elements (here, 4 * 4 = 16)
-  # n_var * (n_regimes - 1) (here, 4 * 6 = 24)
-  # total here of 40
+# n_var * n_var elements (here, 4 * 4 = 16)
+# n_var * (n_regimes - 1) (here, 4 * 6 = 24)
+# total here of 40
 
 # Write gibbs sampling results for regimes into respective spots in the lambda array
 lambda[,1:6,] <- mcmc_output$xout[17:40,]
@@ -369,7 +370,9 @@ mout <-
     lh = mcmc_output$lh[draw_seq],                # un-normalized posterior
     efac = mcmc_output$dsout[draw_seq],      # density component from non-normal adj parameters
     trunc = 0.95                        # where to truncate Gaussian for GD method
-)
+  )
+
+save(mout, "./testing/new_output/mdd_")
 ## OUTPUT: with and without correction for this GD truncation
 
 # PLOT_IMPULSE_RESPONSE (Figs 1-8) ---------------------------------------------------
@@ -418,7 +421,7 @@ irname = 'testing/new_output/model'
 ## 5x5 Blocks (Figures 1-4)  ##########################
 
 # JMO - only one 4x4 block here, making it the same as the one just above
-#   commented out again, but left in for illustrative purposes:
+#   So, commented out again, but left in for illustrative purposes:
 
 # blocks = list()
 # blocks[[1]] = list(x = 1:4,y=1:4)
@@ -531,18 +534,18 @@ irname = 'testing/new_output/model'
 
 
 
-# JMO - STOPPED HERE FOR REWORK FOR NOW ----------
 
 ## Variance decomposition ##########################
 
+## JMO - not sure about this component's role in new research, commenting out for now:
 
-vd = ir;
-
-for (iv in 1:dim(ir)[4]){
-  vd[,,,iv] = vdecomp(ir[,,,iv])
-}
-
-blocks = list(list(x=c(1:4),y=c(1:10)))
+# vd = ir;
+#
+# for (iv in 1:dim(ir)[4]){
+#   vd[,,,iv] = vdecomp(ir[,,,iv])
+# }
+#
+# blocks = list(list(x=c(1:4),y=c(1:10)))
 
 ## Portrait orientation
 ## impulseplots(
@@ -554,18 +557,16 @@ blocks = list(list(x=c(1:4),y=c(1:10)))
 ##     varnames = var_names,
 ##     width = 6, height = 3)
 
-impulseplots(
-  ir = apply(vd,c(1:3),median),
-  irdraws = vd,
-  shocknames = as.character(1:4),
-  blocks = blocks,
-  filename = paste(irname,'_vd',sep=''),
-  varnames = var_names,
-  width = 8, height = 5)
+# impulseplots(
+#   ir = apply(vd,c(1:3),median),
+#   irdraws = vd,
+#   shocknames = as.character(1:4),
+#   blocks = blocks,
+#   filename = paste(irname,'_vd',sep=''),
+#   varnames = var_names,
+#   width = 8, height = 5)
 
 # CALCULATE_FORECASTS ----------------------------------------------------------
-
-# JMO - NOT RUN, NEED MORE INFO:
 
 ## This script estimates models (posterior modes thereof) using data available up to each date
 ## t, and then calculates 48-month-out forecasts with each model. It is provided to allow the user
@@ -583,9 +584,6 @@ impulseplots(
 
 
 
-
-
-
 ## Set tuning parameters #######################
 
 
@@ -594,11 +592,39 @@ filename = 'testing/new_output/forecast_out'
 nvar = 4
 lc_A0 = matrix(TRUE, nvar, nvar)
 
-## dates at which to calculate POOS
-test_dates = seq(
-  from = as.Date('1979/10/01'),
-  to = as.Date('2015/05/01'),
-  by = '1 month')
+
+# If needed, reload data (optout) from CALCULATE_POSTERIOR_DRAWS above:
+load('testing/new_output/gmode.rda')
+new_df <-
+  read_csv("~/Freelancing/2023_02_replication_analyses/use_case_data.csv")
+
+#JMO - variables added for improved convenience/code clarity below:
+n_vars <- ncol(optout$dat_ts)
+n_obs <- nrow(optout$dat_ts)
+n_lags <- optout$n_lags
+regime_breaks <- optout$breaks_pos
+datevar <- new_df$time
+# string names for plotting:
+var_names = c("FED", "LGDP", "LPCE", "VFCI")
+
+## JMO - The original code for test_dates truncates at the beginning of the data sample:
+##   test_dates <- seq(from = as.Date('1979/10/01'),
+##                     to = as.Date('2015/05/01'),
+##                     by = '1 month')
+##    (where the whole 510-row sample goes from 1973/1/1 to 2015/6/1.
+##
+## The paper comments on this choice here, in footnote 24 on p. 1872:
+##   "The truncation at the beginning of the sample comes from the requirement of
+##   having two variance regimes to identify the parameters. Unfortunately, this
+##   cuts out some interesting macroeconomic turbulence in the 1970s.
+##   Additionally, for the period October 1979 to December 1982, we use models
+##   with six lags because of the smaller availability of data."
+##
+## Would need to know what is to be done here for this model,
+## in part as I don't yet fully understand the need for truncation for param identification
+##
+## But, for the sake of progress, using a similar start time for test_dates here
+## removing the oil crisis period.
 
 ## Locations of variance breaks
 # 1962Q1-1979Q3 & Oil crisis and stagflation
@@ -609,12 +635,17 @@ test_dates = seq(
 # 2011Q1-2019Q4 & Zero Lower Bound, Recovery from crisis
 # 2020Q1-2022Q3 & Covid-19 pandemic and war in Ukraine
 
+
+# so, 1979q4 to
+test_dates <- datevar[which(datevar == "1979q4"):(length(datevar)-1)]
+ndates <- length(test_dates)
+
+## JMO - Cut out one break:
 period_breaks <-
   c("1979q3", "1982q4",  "1989q4", "2007q4",  "2010q4", "2019q4")
-
-ndates = length(test_dates)
-
-
+## JMO - Use this for code rework needed below:
+period_breaks_position <-
+  match(period_breaks, test_dates, nomatch = 0)
 
 ## Run the estimation and forecasts ######################
 
@@ -631,51 +662,88 @@ retcode = list() ## return code of the optimization, so you can check if a poste
 seed_model = NULL ## starting point
 ntsbold = 0 ## this will be used by the loop to determine when to add new variance regime
 
+
 for (imodel in 1:ndates){
 
   idate = test_dates[imodel]
-  # JMO - (this won't work w/o actual dates)
-  ntsb = sum(period_breaks < idate) ## number of variance regimes
+
+  # JMO - (original code here won't work w/o actual dates), need to rework:
+  # ntsb = sum(period_breaks < idate)
+
+  ##  JMO - same thing - How many breaks have a position before the current date's position
+  ##.  which is noted in the original code as being the number of variance regimes
+  ntsb <- sum(period_breaks_position < imodel)
+
+
 
   seedx = seed_model$x
   seedh = seed_model$opt$H
 
+  # JMO - what to do with data when we enter into a new period:
   if ((ntsb > ntsbold) & (imodel > 1)){
     ## new variance
-    seed_model$lambda = cbind(seed_model$lambda,rep(1,10))
-    seedx = c(seedx[1:100],c(seed_model$lambda[,-(dim(seed_model$lambda)[2])]))
+    ## JMO - prior code below adds a new column to lambda, but should have the same as ncol lambda, not just 10
+    # seed_model$lambda = cbind(seed_model$lambda,rep(1,10))
+    ## JMO - Below then appends the lambda to x, less the first column just added (why not just do this first then?)
+    ##    Also, it's only taking the first 100 positions of x regardless of iteration
+    ##    100 is the crossing of 10 var / 10 shock case from the previous analysis, so 16 here?
+    ##    should it presumably be (nrow(lambda))^2 in the general case?
+    # seedx = c(seedx[1:100],c(seed_model$lambda[,-(dim(seed_model$lambda)[2])]))
+
+    ## JMO - Same thing here, but updated - reversing operations order, & using just a 1 for column add
+    ## (using 1 smooths over this generally here, but any package should use a more explicit solution)
+    ##  Add all elements from previous lambda to seedx:
+    seedx = c(seedx[1:(nrow(seed_model$lambda)^2)], seed_model$lambda)
+    ##  Then add a new column of 1's to the lambda
+    seed_model$lambda = cbind(seed_model$lambda, 1)
+
+    ## JMO -left this, seems fine:
     seedh = NULL
   }
 
   ntsbold = ntsb
 
-  if (idate <= as.Date('1982/12/01')){
-    nLags = 2 ## not enough data for 10 lags
+  ## JMO - Presumably this is similar.
+  ##  Code originally cut down a log-10 to a lag-6 in monthly
+  ##
+  ## If the monthly nLags = 10 is equivalent to nLags = 3 (9 mos) in quarterly,
+  ## then the equivalent of 6 is either 1.8 (10 months) or 2 (9 months),
+  ## So, using 2:
+  if (imodel <= which(test_dates == "1982q4")){
+    nLags = 2 ## not enough data for 3 lags
   } else {
     nLags = 3
   }
 
+  ## JMO - set period iterations
+
   ## get posterior mode
-  seed_model = fit_tvv(
-    dat = df_out,
-    date_var = time,
-    vars = c(fedfunds, lgdp, lpce, vfci), # not required, as this is all vars in data
-    n_lags = n_lags,
-    lc_A0 = lc_A0, # no restrictions
-    lmdblock = NULL, # default option: all variances change in all periods
-    period_breaks = period_breaks,
-    v_prior = 0, # default options, weight 0.01 on each row
-    startdate = as.Date('1973/1/1'),
-    enddate = idate,
-    verbose = TRUE,
-    seedx = seedx,
-    seedH = seedh,
-    cosprior = NULL,
-    critval = 1e-6
-  )
+  seed_model <-
+    fit_tvv(
+      dat = new_df,
+      date_var = time,
+      vars = c(fedfunds, lgdp, lpce, vfci), # not required, as this is all vars in data
+      n_lags = nLags,
+      lc_A0 = lc_A0, # no restrictions
+      lmdblock = NULL, # default option: all variances change in all periods
+      period_breaks = period_breaks[1:ntsb],
+      v_prior = 0, # default options, weight 0.01 on each row
+      startdate = "1962q1",
+      enddate = idate,
+      verbose = TRUE,
+      seed_x = seedx,
+      seed_H = seedh,
+      cos_prior = NULL,
+      critval = 1e-6,
+      maxit = 10 # too short, testing if this will run
+    )
 
   models_out[[imodel]] = seed_model$x ## save only x
-  fc_out[[imodel]] = get_forecast(seed_model,48)
+  ## JMO - nperiods was previously 48 months, so 4 years
+  ##.      see original code comments above from authors
+  ##       code indicates this is to "get a forecast n periods into the future"
+  ##.      the equivalent here would be nperiods = 16:
+  fc_out[[imodel]] = get_forecast(seed_model, nperiods = 16)
   retcode[[imodel]] = seed_model$opt$retcodeh
 
   ## Save as we go, just in case of an interruption
@@ -685,8 +753,11 @@ for (imodel in 1:ndates){
 
 }
 
-fc_array = array(unlist(fc_out),
-                 c(dim(fc_out[[1]]),ndates))
+
+# fc_array = array(unlist(fc_out), c(dim(fc_out[[1]]),ndates))
+## JMO - this is way simpler,/clearer, and the package already depends on abind:
+fc_array = abind::abind(fc_out, along = 3)
+
 save(fc_array,file = paste(filename,'_fc_array.Rdata',sep=''))
 
 
@@ -707,295 +778,225 @@ save(fc_array,file = paste(filename,'_fc_array.Rdata',sep=''))
 
 ## Example posterior mode, from which I grab "cleaned" (log transformed, correct
 ## date range) data
-load('testing/old_output_replic/postmode.Rdata')
+# load('testing/old_output_replic/postmode.rda')
+# ydata = optout$listData$Y[-(1:81),] # 1 = October 1979
 
-## Forecasts
-load('testing/new_output/fc_combined.Rdata')
+## JMO - doing what the commented-out code above
+## in a more straightforward way that works here:
+ydata <-
+  read_csv("~/Freelancing/2023_02_replication_analyses/use_case_data.csv") |>
+  slice(which(time == "1979q4"):n()) |>
+  select(-time)
 
-forecast_full = fc$main                 # all variables model
-forecast_nos = fc$nos                   # no spreads
-forecast_noc = fc$noc                   # no credit variables
+## Forecasts (JMO - if not still loaded from just above):
+load('testing/new_output/forecast_out_fc_array.Rdata')
 
+## JMO - not needed as our code only has one type, the all variables model
+# forecast_full = fc$main                 # all variables model
+# forecast_nos = fc$nos                   # no spreads
+# forecast_noc = fc$noc                   # no credit variables
+
+forecast_full <- fc_array
 
 ## Plot forecasts in the financial crisis #######################
 
 
-ydata = optout$listData$Y[-(1:81),] # 1 = October 1979
 
 ## What sequence of dates at which to plot forecasts
-ds = seq(as.Date('2007/1/1'),by='3 month',length = 16) # sequence of dates to plot
-fulldates = seq(from = as.Date('1979/10/01'),          # date sfor ydata
-                to = as.Date('2015/05/01'),
-                by = '1 month')
+# ds = seq(as.Date('2007/1/1'),by='3 month',length = 16) # sequence of dates to plot
+# fulldates = seq(from = as.Date('1979/10/01'),          # date sfor ydata
+#                 to = as.Date('2015/05/01'),
+#                 by = '1 month')
+
+## JMO - making the equivalent from 2007q1 to 2019q3 (just before last period as they did, correct?)
+ds <-
+  # sequence of dates to plot
+  expand_grid(2007:2019, "q", 1:4) |>
+  slice(-n()) |> # remove last row, i.e. 2019q4
+  pmap_chr(paste0) # bind together
+
+
+fulldates <-
+  datevar[which(datevar == "1979q4"):(length(datevar)-1)]
 
 ids = rep(0,length(ds))                 # indexes of the forecast dates
+
 for (i in 1:length(ds)){
   ids[i] = which(fulldates == ds[i])
 }
 
-padding = c(3,15)                       # how many extra months of data to put on either side
-ydata = ydata[(ids[1] - padding[1]):(ids[length(ids)] + padding[2]),]
+# padding = c(3,15)                       # how many extra months of data to put on either side
+padding = c(1,5)                       # JMO - how many extra quarters of data to put on either side
+
+ydata_fplot = ydata[(ids[1] - padding[1]):(ids[length(ids)] + padding[2]),]
 fulldates = fulldates[(ids[1] - padding[1]):(ids[length(ids)] + padding[2])]
-
-
-
 
 
 ## NOTE: This takes an optional argument ymat that specifies axis limits
 ## I calibrated these "by hand" to include the data plus the forecasts plus some white space.
 ## If you change the time period for this plots, remember to change the limits too!
 
-plotfc(forecast_full[1:12,,ids],      # full variables model
-       ydata, ds,
-       vnames, fulldates,
-       filename = 'testing/new_output/crisis_forecast_full')
+v_names = c("FED", "LGDP", "LPCE", "VFCI") # short names
 
-plotfc(forecast_nos[1:12,,ids],       # no spread model
-       ydata[,1:7], ds,
-       vnames[1:7], fulldates,
-       filename = 'testing/new_output/crisis_forecast_nos',
-       ymat = c(4.35,4.70,
-                4.55,4.65,
-                8.2, 8.5,
-                7.00,7.40,
-                7.20,7.60,
-                -0.02,0.06,
-                5.6,6.4))
+## JMO - 1-year (4 quarters) forecasting version:
+forecast_full_12mos <-
+  forecast_full[1:4,,ids]
 
-plotfc(forecast_noc[1:12,,ids],       # no credit model
-       ydata[,c(1:2,5:10)], ds,
-       vnames[c(1:2,5:10)], fulldates,
-       filename = 'testing/new_output/crisis_forecast_noc',
-       ymat = c(4.35,4.70,
-                4.55,4.65,
-                7.20,7.60,
-                -0.02,0.06,
-                5.6,6.4,
-                -0.01,0.05,
-                0.00,0.12,
-                -0.01,0.05))
+
+plotfc(fcout = forecast_full_12mos,      # 12 month projection model
+       ydata = ydata_fplot,
+       dateseq = ds,
+       vnames = v_names,
+       fulldates = fulldates,
+       frequency = 4,
+       filename = 'testing/new_output/crisis_forecast_full_12mos')
+
+## JMO - 1-year (4 quarters) forecasting version:
+forecast_full_24mos <-
+  forecast_full[1:8,,ids]
+
+plotfc(fcout = forecast_full_24mos,      # 12 month projection model
+       ydata = ydata_fplot,
+       dateseq = ds,
+       vnames = v_names,
+       fulldates = fulldates,
+       frequency = 4,
+       filename = 'testing/new_output/crisis_forecast_full_24mos')
+
+# plotfc(forecast_nos[1:12,,ids],       # no spread model
+#        ydata[,1:7], ds,
+#        vnames[1:7], fulldates,
+#        filename = 'testing/new_output/crisis_forecast_nos',
+#        ymat = c(4.35,4.70,
+#                 4.55,4.65,
+#                 8.2, 8.5,
+#                 7.00,7.40,
+#                 7.20,7.60,
+#                 -0.02,0.06,
+#                 5.6,6.4))
+
+# plotfc(forecast_noc[1:12,,ids],       # no credit model
+#        ydata[,c(1:2,5:10)], ds,
+#        vnames[c(1:2,5:10)], fulldates,
+#        filename = 'testing/new_output/crisis_forecast_noc',
+#        ymat = c(4.35,4.70,
+#                 4.55,4.65,
+#                 7.20,7.60,
+#                 -0.02,0.06,
+#                 5.6,6.4,
+#                 -0.01,0.05,
+#                 0.00,0.12,
+#                 -0.01,0.05))
 
 
 
 
 ## Get and plot RMSE #########################
 
+ydata_rmse <- as.matrix(ydata)
 
-yd = optout$listData$Y[-(1:81),]
+# myH = c(1,6,12,24,48)                   # what horizons for RMSE
+myH = c(1,2,4,8,16)                   # what horizons for RMSE (JMO -converted to quarters)
+mySeries = c(1:4)      # what variables to use; (JMO - all here, so not needed)
 
-myH = c(1,6,12,24,48)                   # what horizons for RMSE
-mySeries = c(1:2,5:7)      # what variables to use; this is overlap of
-# all three models
+# rmse_full = getrmse(forecast_full[,c(1:2,5:7),],yd[,mySeries],h=myH)
+# rmse_nos = getrmse(forecast_nos[,c(1:2,5:7),],yd[,mySeries],h=myH)
+# rmse_noc = getrmse(forecast_noc[,c(1:5),],yd[,mySeries],h=myH)
 
-rmse_full = getrmse(forecast_full[,c(1:2,5:7),],yd[,mySeries],h=myH)
-rmse_nos = getrmse(forecast_nos[,c(1:2,5:7),],yd[,mySeries],h=myH)
-rmse_noc = getrmse(forecast_noc[,c(1:5),],yd[,mySeries],h=myH)
+rmse_full = getrmse(forecast_full, ydata_rmse, h=myH)
 
-plotrmse(c(1979,10),
-         rmse_full,
-         rmse_nos,
-         rmse_noc,
-         'testing/new_output/rmse_6mo',
-         vname = vnames[mySeries],
+plotrmse(rmse_full, # JMO - function now takes any # of rmse entries here
+         sdate = c(1979,4), # meaning 1979q4
+         filename = 'testing/new_output/rmse_6mo',
+         vname = v_names,
          ih = 2)                          # 6-month horizon (2nd one in the list)
 
-plotrmse(c(1979,10),
-         rmse_full,
-         rmse_nos,
-         rmse_noc,
-         'testing/new_output/rmse_24mo',
-         vname = vnames[mySeries],
+plotrmse(rmse_full,
+         sdate = c(1979, 4),
+         filename = 'testing/new_output/rmse_24mo',
+         vname = v_names,
          ih = 4)                          # 24-month horizon (2nd one in the list)
 
 
 
 # MAKE_TABLE_3 ------------------------------------------------------------
 
-
-
-## Plots a few different permutations of impulse responses
-## All output is saved as pdf files in the plots/ subdiectory
-
+## Gets MDD Estimates for Table 3
 ## Karthik Sastry
-## January 2018
+## November 2020
+
+## Load draws for t and normal models ######################
+
+## For replication purposes, we re-create the main
+## result using saved draws from multiple MCMC chains
+
+# JMO - load the fit data to get things used below:
+load(file = './testing/new_output/gmode.rda') # optout
+load('testing/new_output/mcmc_out.rda') # output
 
 
-## Load in an impulse response file ############################
+## JMO - did not get the chance to determine where this came from, and what format it is in
+## for use in the get_mdd()
+# load('output/replication_mdd.Rdata') # JMO - this is
 
 
-## filename = 'testing/new_output/mcmc_out_ir.Rdata' # if you ran get_posterior_draws.R
-filename = 'testing/new_output/replication_irf_draws.Rdata' # if you want to exactly replicate plots in the draft
+## t Model
 
-irname = 'testing/new_output/model'               # stem for all the titles
-
-load(filename)
-if (!is.null(names(ir))){
-  ir = ir$ir[,,,1,]                       # easier to read code
+## t model
+mdd_t = rep(0,6)
+for (ic in 1:6){
+  mdd_t[ic] = get_mdd(t(mdd_draws$t_draws$x[,,ic]),mdd_draws$t_draws$lh[,ic],covsub=FALSE,trunc=0.95)
 }
+print(median(mdd_t))                    # Row 2
 
-## Names of all the variables
-vnames = c("FED", "LGDP", "LPCE", "VFCI")
-
-
-
-
-## Plot all IR  ###########################
-
-
-## Duplicates the same action at the end of get_posterior_draws.R
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  conf = c(0.68,0.90), ## posterior uncertainty bands
-  shocknames = as.character(1:10),
-  filename = paste(irname,'_irplot',sep=''),
-  varnames = vnames,
-  width = 6, height = 8)
-
-
-
-## 5x5 Blocks (Figures 1-4)  ###########################
-
-
-blocks = list()
-blocks[[1]] = list(x = 1:5,y=1:5)
-blocks[[2]] = list(x = 1:5,y=6:10)
-blocks[[3]] = list(x = 6:10,y=1:5)
-blocks[[4]] = list(x = 6:10,y=6:10)
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_block',sep=''),
-  varnames = vnames,
-  width = 6, height = 6)
-
-
-## Monetary Policy Shock ##########################
-
-
-blocks = list(list(x=c(1:5),y=6))
-blocks[[2]] = list(x=c(6:10),y=6)
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = NULL,
-  blocks = blocks,
-  filename = paste(irname,'_mopo',sep=''),
-  varnames = vnames,
-  width = 3, height = 6)
-
-
-## Credit Shocks  ##########################
-
-
-blocks = list(list(x=c(1:5),y=c(3:4)))
-blocks[[2]] = list(x=c(6:10),y=c(3:4))
-
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_credit',sep=''),
-  varnames = vnames,
-  width = 3, height = 6)
-
-
-## Spread Shocks ##########################
-
-
-blocks = list(list(x=c(1:5),y=c(9:10)))
-blocks[[2]] = list(x=c(6:10),y=c(9:10))
-impulseplots(
-  ir = apply(ir,c(1:3),median),
-  irdraws = ir,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_spread',sep=''),
-  varnames = vnames,
-  width = 3, height = 6)
-
-
-## Credit + Monetary Shocks ############################
-
-ir_small = ir[,c(3,4,6),,]
-ndraw = dim(ir_small)[4]
-
-## allocating space
-irmix = array(0,c(10,5,60,ndraw)) ## the mixed impulse response
-
-## Constructing the IR mix
-nperiod = 60
-
-for (iperiod in 1:nperiod){
-  raw_response = ir_small[,1:2,iperiod,] + irmix[,4:5,iperiod,] ## without compensating policy
-
-  ## for shock 3
-  policy_weight = -raw_response[6,1,] / ir_small[6,3,1,] ## amount of monetary policy shock to add
-  irmix[,4,iperiod,] = raw_response[,1,]
-  irmix[,4,iperiod:nperiod,] = irmix[,4,iperiod:nperiod,] + rep(policy_weight,each=10 * (nperiod-iperiod+1)) * ir_small[,3,1:(nperiod-iperiod+1),]
-
-  ## for shock 4
-  policy_weight = -raw_response[6,2,] / ir_small[6,3,1,] ## amount of monetary policy shock to add
-  irmix[,5,iperiod,] = raw_response[,2,]
-  irmix[,5,iperiod:nperiod,] = irmix[,5,iperiod:nperiod,] + rep(policy_weight,each=10 * (nperiod-iperiod+1)) * ir_small[,3,1:(nperiod-iperiod+1),]
+## normal model
+mdd_n = rep(0,4)
+for (ic in 1:4){
+  mdd_n[ic] = get_mdd(t(mdd_draws$n_draws$x[,,ic]),mdd_draws$n_draws$lh[,ic],covsub=FALSE,trunc=0.95)
 }
-
-irmix[,1:3,,] = ir_small
-
-## Plotting this
-
-sn = c('Shock 3 (HHC)','Shock 4 (BC)','MP','3 + MP','4 + MP')
-
-blocks = list()
-blocks[[1]] = list(x = c(1:4,6),y=c(1,2,4,5))
-
-impulseplots(
-  ir = apply(irmix,c(1:3),median),
-  irdraws = irmix,
-  shocknames = sn,
-  blocks = blocks,
-  filename = paste(irname,'_creditMP',sep=''),
-  varnames = vnames,
-  width = 6, height = 6)
+print(median(mdd_n))                    # Row 3
 
 
+## Unrestricted dynamics in each period #######################
 
-## Variance decomposition #################################################
+
+## Prior tuning parameters
+lambda = 5                              # co persistence dummies
+mu = 1
+mn_prior = list(tight = 3,decay = .5)          # MN prior
+v_prior = list(sig = rep(.01,10), w = 1) # variance prior
+
+## Data paremeters
+nLags = 3
+
+period_breaks <-
+  c("1979q3", "1982q4",  "1989q4", "2007q4",  "2010q4", "2019q4")
+
+data <-
+  optout$dat_ts
 
 
-vd = ir;
+breaks_pos = c(nLags+1,optout$breaks_pos, nrow(data)) # add the first and last points as well
 
-for (iv in 1:dim(ir)[4]){
-  vd[,,,iv] = vdecomp(ir[,,,iv])
+## Loop over each set of dates and estimate MDD
+nreg = length(breaks_pos)-1                   # number of regimes
+mgnl = rep(0,nreg)                         # placeholder for MDD estimates
+for (iregime in 1:nreg){
+  date_range = (breaks_pos[iregime]-nLags):(breaks_pos[iregime+1]) # allowing for 10 periods of initial conditions
+  Yrange = data[date_range,]               # relevant range of data
+
+  mgnl[iregime] = mgnldnsty(Yrange,nLags,lambda=lambda,mu=mu,
+                            mnprior = mn_prior,vprior=v_prior)$w
 }
+mdd_total = sum(mgnl)
+print(mdd_total)                        # Row 4
 
-blocks = list(list(x=c(1:4),y=c(1:10)))
+##
+## One big reduced form VAR
+##
 
-## Portrait orientation
-## impulseplots(
-##     ir = apply(vd,c(1:3),median),
-##     irdraws = vd,
-##     shocknames = as.character(1:10),
-##     blocks = blocks,
-##     filename = paste(irname,'_vd_portrait',sep=''),
-##     varnames = vnames,
-##     width = 6, height = 3)
-
-impulseplots(
-  ir = apply(vd,c(1:3),median),
-  irdraws = vd,
-  shocknames = as.character(1:10),
-  blocks = blocks,
-  filename = paste(irname,'_vd',sep=''),
-  varnames = vnames,
-  width = 8, height = 5)
-
+mgnl = mgnldnsty(data, nLags, lambda=lambda, mu=mu, mnprior=mn_prior, vprior=v_prior)$w
+print(mgnl)                             # Row 1
 
 # MAKE_TABLE_4 ------------------------------------------------------------
 
@@ -1088,8 +1089,8 @@ eps_out = array(0,c(500,10,ndraw))
 eps_scaled = eps_out ## divided by the regime variance
 dimpact = matrix(0,10,ndraw)
 
-Tsigbrk = diff(c(0,optout$Tsigbrk[2:6] - 10,500))
-Tlist = rep(1:6,times=Tsigbrk)
+breaks_pos = diff(c(0,optout$breaks_pos[2:6] - 10,500))
+Tlist = rep(1:6,times=breaks_pos)
 
 
 for (idraw in 1:ndraw){
@@ -1240,8 +1241,8 @@ mya = output$aout[,,mysample]
 ic = optout$listData$Y[1:10,]
 
 ## Periods for variance regimes
-lmdp =  c(diff(optout$Tsigbrk),
-          dim(optout$listData$Y)[1] - optout$Tsigbrk[length(optout$Tsigbrk)])
+lmdp =  c(diff(optout$breaks_pos),
+          dim(optout$listData$Y)[1] - optout$breaks_pos[length(optout$breaks_pos)])
 lmdp[1] = lmdp[1] - 10
 
 ## Set random seed for exact replication

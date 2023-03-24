@@ -1,4 +1,17 @@
 
+#' Title
+#'
+#' @param tvvout
+#' @param lambda
+#' @param lmdp
+#' @param burn
+#' @param y0
+#' @param delta
+#'
+#' @return
+#' @export
+#'
+#' @examples
 sim_model <-
   function(tvvout, ## output of optimization
            lambda = matrix(1,nv,6), ## - log variances
