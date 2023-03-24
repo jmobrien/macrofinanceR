@@ -207,20 +207,21 @@ impulseplots <-
 #' Title forecast plotting
 #'
 #' @param fcout forecasting results
-#' @param ydata
-#' @param dateseq
-#' @param vnames
-#' @param fulldates
+#' @param ydata Original variable dataframe
+#' @param dateseq Vector of points from which to draw forecasting lines
+#' @param vnames Names of variables to use for each plot
+#' @param fulldates full range of dates associated with time series
+#' @param frequency how often time points are sampled per year (e.g. 12 for
+#'   monthly data, 4 for quarterly data)
 #' @param ymat
 #' @param filename
 #' @param cushion
 #'
 #' @return
 #' @export
-#'
-#' @examples
 plotfc <- function(fcout, ydata, dateseq,
                    vnames, fulldates,
+                   frequency = 12,
                    ymat = c(4.35,4.70,
                             4.55,4.65,
                             8.2,8.5,
@@ -231,6 +232,7 @@ plotfc <- function(fcout, ydata, dateseq,
                             -0.01,0.05,
                             0.00,0.12,
                             -0.01,0.05),
+                   start_date = NULL,
                    filename = 'fcout',
                    cushion = 0){
 
@@ -255,11 +257,26 @@ plotfc <- function(fcout, ydata, dateseq,
     iy <- which(fulldates == dateseq[idate])
     yt <- ydata[iy,] # y data
 
-    fclist[[idate]] <- ts(rbind(yt,fcout[,,idate]),
-                          start =
-                            c(as.numeric(format(sdate,format = '%Y')),
-                              as.numeric(format(sdate,format = '%m'))),
-                          frequency = 12)
+    ## JMO this is a terrible hack but I'm putting it in to get this to work right now with quarters
+    if(frequency == 12){
+      startpoint <-
+        c(as.numeric(format(sdate,format = '%Y')),
+          as.numeric(format(sdate,format = '%m')))
+    } else if (frequency == 4) {
+      startpoint <-
+        sdate |>
+        strsplit(" ?[qQ] ?") |>
+        unlist() |>
+        as.numeric()
+    }
+
+
+    fclist[[idate]] <-
+      unlist(yt) |>
+      rbind(fcout[,,idate]) |>
+      ts(start = startpoint,
+         frequency = frequency)
+
     ## ylist[[idate]] = ts(yt,
     ##                     start =
     ##                         c(as.numeric(format(sdate,format = '%Y')),
@@ -276,12 +293,25 @@ plotfc <- function(fcout, ydata, dateseq,
   ##                  as.numeric(format(dateseq[1],format = '%m'))),
   ##            frequency = 12)
 
-  ytrim <- ts(ydata,
-              start =
-                c(as.numeric(format(fulldates[1],format = '%Y')),
-                  as.numeric(format(fulldates[1],format = '%m'))),
-              frequency = 12)
+  ## JMO this is a terrible hack but I'm putting it in to get this to work right now with quarters
+  if(frequency == 12){
+    trim_startpoint <-
+      c(as.numeric(format(fulldates[1],format = '%Y')),
+        as.numeric(format(fulldates[1],format = '%m')))
+  } else if (frequency == 4) {
+    trim_startpoint <-
+      (fulldates[1]) |>
+      strsplit(" ?[qQ] ?") |>
+      unlist() |>
+      as.numeric()
+  }
 
+  ytrim <-
+    ydata |>
+    ts(
+      start = trim_startpoint,
+      frequency = frequency
+    )
 
 
 
@@ -299,8 +329,10 @@ plotfc <- function(fcout, ydata, dateseq,
       ## ts(tsdata[fullrange,iv],start = c(2006,9),frequency = 12),
       ytrim[,iv],
       type = 'l', lwd = 1.5,
-      ylab = '',xlab = '',
-      ylim = ymat[,iv])
+      ylab = '',xlab = '' #,
+      # ylim = ymat[,iv]
+    )
+
     title(main = vnames[iv])
 
     grid(nx = NULL, ny = nx, col = "lightgray", lty = "dotted",
@@ -316,21 +348,66 @@ plotfc <- function(fcout, ydata, dateseq,
 }
 
 
-plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
-                     vname = rep(NULL,nv), ih = 1, height = 8, width = 6.5, diff = FALSE,
-                     rshade = TRUE){
+#' generate rmse plots
+#'
+#' @param ... rmse's to include, from getrmse()
+#' @param sdate start date for time series, as 2 element numeric: c([time unit], [time subunit in specified frequency])
+#' @param frequency how often time points are sampled per year (e.g. 12 for
+#'   monthly data, 4 for quarterly data)
+#' @param filename file name to output pdf to
+#' @param vname names of variables to be plotted
+#' @param ih which horizon to plot?  Indicates position in getrmse()'s array output, not horizon length itself)
+#' @param height plot height
+#' @param width plot width
+#' @param diff if TRUE, calculate as differences
+#' @param rshade if TRUE, shade recession periods
+#' @param rlist numeric position (in years) of start/end points of recession periods
+#' @param colors what colors to use for each of the rmse's added?  Will generate from rainbow() if unspecified
+#'
+#'
+#' @return
+#' @export
+plotrmse <- function(...,
+                     sdate,
+                     frequency = 12,
+                     filename,
+                     vname = rep(NULL,nv),
+                     ih = 1,
+                     height = 8, width = 6.5,
+                     diff = FALSE,
+                     rshade = TRUE,
+                     rlist = c(1980, 1980 + 6/12,
+                               1981 + 6/12,  1982 + 10/12,
+                               1990 + 6/12, 1991 + 2/12,
+                               2001 + 2/12, 2001 + 10/12,
+                               2007 + 11/12, 2009 + 5/12),
+                     colors = NULL
+                     ){
 
-  nv <- dim(rmse1)[2]
+  # Pull out the rmse's
+  rmses <- list(...)
+
+  names(rmses) <- paste0("rmse", seq_along(rmses))
+
+  if(missing(colors)){
+    line_colors <- rainbow(length(rmses))
+  } else {
+    line_colors <- colors
+  }
+
+  # list2env(rmses)
+
+  nv <- dim(rmses[[1]])[2]
 
   grDevices::pdf(paste(filename,'.pdf',sep = ''),height = 8, width = 6.5)
 
   par(mfrow = c(nv,1),col.lab="black",col.main="black",
       oma=c(1,3,1,2), mar=c(2,1,1,1), tcl=-0.1, mgp=c(0,0,0))
 
-  nrmse <- c(1,6,12,24,48) ## number of months
+  nrmse <- c(1,6,12,24,48) * (frequency/12) ## number of months (JMO - adjusted)
   nrmse <- nrmse[ih]
   ## snip these off the end
-  Tobs <- dim(rmse1)[3]
+  Tobs <- dim(rmses[[1]])[3]
 
   irange <- 1:(Tobs-nrmse)
 
@@ -338,26 +415,15 @@ plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
   ## rmse2 <- rmse1[,,1:(Tobs-nrmse)]
   ## rmse3 <- rmse1[,,1:(Tobs-nrmse)]
 
-  if (rshade) {
-    ## gen list of recessions
-    rlist <- c(1980, 1980 + 6/12,
-               1981 + 6/12,  1982 + 10/12,
-               1990 + 6/12, 1991 + 2/12,
-               2001 + 2/12, 2001 + 10/12,
-               2007 + 11/12, 2009 + 5/12)
-    rlist <- matrix(rlist,2,5)
-  }
-
-
   for (iv in 1:nv){
     ## plot each variable
 
     if (diff){
       ## difference mode
 
-      drmse <- rmse1[ih,iv,] - rmse2[ih,iv,]
+      drmse <- rmses[[1]][ih,iv,] - rmse[[2]][ih,iv,]
 
-      plot(ts(drmse,sdate,frequency = 12), type = 'l', lwd = 1,
+      plot(ts(drmse,sdate,frequency = frequency), type = 'l', lwd = 1,
            ylab = NULL, xlab = NULL)
       abline(a = 0, b = 0, lwd = 0.75) ## axis
       grid(lwd = .5)
@@ -365,17 +431,19 @@ plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
     } else {
       ##ymin <- min(rmse1[ih,iv,],rmse2[ih,iv,])
       ymin <- 0
-      ymax <- max(rmse1[ih,iv,],rmse2[ih,iv,]) * 1.1 ## breathing room
+      # ymax <- max(rmses[[1]][ih,iv,],rmse2[ih,iv,]) * 1.1 ## breathing room
+      ymax <- (sapply(rmses, \(x){x[ih,iv,]}) |> max()) * 1.1 ## breathing room
 
       ## plot(ts(rmse1[ih,iv,],sdate,frequency=12), type = 'l', lwd = .75, col = 'blue',
       ##      ylab = NULL, xlab = NULL, bty = 'l',ylim = c(ymin,ymax))
 
-      plot(ts(rmse1[ih,iv,],sdate,frequency=12), type = 'n', lwd = .75, col = 'blue',
+      plot(ts(rmses[[1]][ih,iv,],sdate,frequency=frequency), type = 'n', lwd = .75, col = line_colors[1],
            ylab = NULL, xlab = NULL, bty = 'l',ylim = c(ymin,ymax), panel.first = {
              grid(lwd = 1)
            })
 
       if (rshade){
+          rlist <- matrix(rlist,2)
         for (ir in 1:5){
 
           polygon(c(rlist[,ir],rev(rlist[,ir])),
@@ -384,10 +452,14 @@ plotrmse <- function(sdate, rmse1, rmse2, rmse3, filename,
         }
       }
 
-      lines(ts(rmse1[ih,iv,irange],sdate,frequency=12), lwd = .75, col = 'blue')
-      lines(ts(rmse2[ih,iv,irange],sdate,frequency=12),lwd = .75, col = 'red')
-      lines(ts(rmse3[ih,iv,irange],sdate,frequency=12),lwd = .75, col = 'green4')
+      for(i in seq_along(rmses)){
 
+        linedat <-
+          ts(rmses[[i]][ih,iv,irange],sdate,frequency=frequency)
+
+      lines(linedat, lwd = .75, col = line_colors[i])
+
+      }
       ## abline(a = 0, b = 0, lwd = 0.75) ## axis
 
 
