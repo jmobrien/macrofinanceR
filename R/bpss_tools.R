@@ -291,6 +291,46 @@ getrmse <-
 
 
 
+#' generates residuals from draws
+#'
+#' @param Aplus
+#' @param A0
+#' @param y
+#' @param nlag
+#'
+#' @return
+#' @export
+#'
+get_epsilon = function(Aplus,A0,y,nlag = 10){
+
+  ## Forms e_t = A(L)y_t
+
+  ## Aplus is (nvar * nlag + 1 constant) x (neq) matrix
+
+  ## Construct the data with lags
+  nv = dim(y)[2] ## number of variables
+  n_obs = dim(y)[1]
+  Tnl = n_obs - nlag ## time periods, adjusting for lags
+
+  ydata = y[nlag + 1:Tnl,] ## data used in calculations
+  ylag = matrix(0,Tnl,nv*nlag + 1)
+  for (ilag in 1:nlag){
+    ylag[,(ilag-1) * nv + 1:nv] =
+      y[nlag - ilag + 1:Tnl,] ## lagged data
+  }
+  ylag[, nv*nlag + 1] = 1 ## constant row
+
+  ## -A+(L) y_t
+  rhs = t(t(Aplus) %*% t(ylag))
+
+  ## A_0 y_t
+  lhs = t(A0 %*% t(ydata))
+
+  ## putting it together
+  eps_mat = lhs - rhs
+
+  return(eps_mat)
+}
 
 
 

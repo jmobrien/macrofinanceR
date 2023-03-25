@@ -3,6 +3,7 @@
 export(McmcIr)
 export(fit_tvv)
 export(gdraw)
+export(get_epsilon)
 export(get_forecast)
 export(get_mdd)
 export(getrmse)
